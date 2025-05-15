@@ -1,11 +1,14 @@
-import { useQuery } from '@tanstack/react-query';
-import * as screeningApi from '@api/screenings';
+// src/hooks/useScreenings.js
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import screeningApi from '@api/screenings';
 
 /**
  * Custom hook for managing screenings
  * Centralizes all screening-related data fetching and mutations
  */
 export const useScreenings = () => {
+  const queryClient = useQueryClient();
+
   /**
    * Get all screenings with optional filtering
    */
@@ -99,6 +102,52 @@ export const useScreenings = () => {
     });
   };
 
+  /**
+   * Create a new screening
+   */
+  const useCreateScreening = (options = {}) => {
+    return useMutation({
+      mutationFn: (data) => screeningApi.createScreening(data),
+      onSuccess: () => {
+        // Invalidate related queries
+        queryClient.invalidateQueries({ queryKey: ['screenings'] });
+        queryClient.invalidateQueries({ queryKey: ['upcoming-screenings'] });
+      },
+      ...options
+    });
+  };
+
+  /**
+   * Update a screening
+   */
+  const useUpdateScreening = (options = {}) => {
+    return useMutation({
+      mutationFn: ({ id, data }) => screeningApi.updateScreening(id, data),
+      onSuccess: (_, variables) => {
+        // Invalidate related queries
+        queryClient.invalidateQueries({ queryKey: ['screenings'] });
+        queryClient.invalidateQueries({ queryKey: ['screening', variables.id] });
+        queryClient.invalidateQueries({ queryKey: ['upcoming-screenings'] });
+      },
+      ...options
+    });
+  };
+
+  /**
+   * Delete a screening
+   */
+  const useDeleteScreening = (options = {}) => {
+    return useMutation({
+      mutationFn: (id) => screeningApi.deleteScreening(id),
+      onSuccess: () => {
+        // Invalidate related queries
+        queryClient.invalidateQueries({ queryKey: ['screenings'] });
+        queryClient.invalidateQueries({ queryKey: ['upcoming-screenings'] });
+      },
+      ...options
+    });
+  };
+
   return {
     useGetScreenings,
     useGetScreening,
@@ -107,7 +156,10 @@ export const useScreenings = () => {
     useGetScreeningsByDateRange,
     useGetUpcomingScreenings,
     useGetScreeningSeats,
-    useGetScreeningFormats
+    useGetScreeningFormats,
+    useCreateScreening,
+    useUpdateScreening,
+    useDeleteScreening
   };
 };
 

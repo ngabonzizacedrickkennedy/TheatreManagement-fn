@@ -1,91 +1,136 @@
 import apiClient from './client';
 
 /**
- * Authentication API service
- * Handles user registration, login, and related operations
+ * Movie API service
+ * Handles all movie-related operations
  */
-const authApi = {
+const movieApi = {
   /**
-   * Login a user with username and password
-   * @param {Object} credentials - User credentials
-   * @param {string} credentials.username - Username
-   * @param {string} credentials.password - Password
-   * @returns {Promise<Object>} Login response with token and user info
+   * Get all movies with optional filtering
+   * @param {Object} params - Query parameters
+   * @param {string} [params.query] - Search query
+   * @param {string} [params.genre] - Filter by genre
+   * @param {string} [params.status] - Filter by status (NOW_PLAYING, UPCOMING)
+   * @returns {Promise<Array>} List of movies
    */
-  login: async (credentials) => {
-    const response = await apiClient.post('/auth/login', credentials);
+  getMovies: async (params = {}) => {
+    const response = await apiClient.get('/movies', { params });
     return response.data;
   },
 
   /**
-   * Register a new user
-   * @param {Object} userData - User data for registration
-   * @param {string} userData.username - Username
-   * @param {string} userData.email - Email
-   * @param {string} userData.password - Password
-   * @param {string} userData.firstName - First name
-   * @param {string} userData.lastName - Last name
-   * @param {string} [userData.phoneNumber] - Optional phone number
-   * @returns {Promise<Object>} Registration response
+   * Get a movie by ID
+   * @param {number|string} id - Movie ID
+   * @returns {Promise<Object>} Movie details
    */
-  register: async (userData) => {
-    const response = await apiClient.post('/auth/signup', userData);
+  getMovieById: async (id) => {
+    const response = await apiClient.get(`/movies/${id}`);
     return response.data;
   },
 
   /**
-   * Get the current user's profile
-   * @returns {Promise<Object>} User profile data
+   * Search movies by title
+   * @param {string} query - Search query
+   * @returns {Promise<Array>} List of movies matching the search
    */
-  getCurrentUser: async () => {
-    const response = await apiClient.get('/user/profile');
+  searchMovies: async (query) => {
+    const response = await apiClient.get('/movies/search', { params: { query } });
     return response.data;
   },
 
   /**
-   * Update the user's profile
-   * @param {Object} userData - Updated user data
-   * @returns {Promise<Object>} Updated user profile
+   * Get movies by genre
+   * @param {string} genre - Genre name
+   * @returns {Promise<Array>} List of movies in the genre
    */
-  updateProfile: async (userData) => {
-    const response = await apiClient.put('/user/profile', userData);
+  getMoviesByGenre: async (genre) => {
+    const response = await apiClient.get(`/movies/genre/${genre}`);
     return response.data;
   },
 
   /**
-   * Change the user's password
-   * @param {Object} passwordData - Password change data
-   * @param {string} passwordData.currentPassword - Current password
-   * @param {string} passwordData.newPassword - New password
+   * Get movies by IDs
+   * @param {Set|Array} ids - Set or array of movie IDs
+   * @returns {Promise<Array>} List of movies
+   */
+  getMoviesByIds: async (ids) => {
+    if (!ids || ids.size === 0 || ids.length === 0) {
+      return [];
+    }
+    
+    const idsArray = Array.from(ids);
+    const response = await apiClient.get('/movies/batch', { params: { ids: idsArray.join(',') } });
+    return response.data;
+  },
+
+  /**
+   * Get upcoming movies
+   * @returns {Promise<Array>} List of upcoming movies
+   */
+  getUpcomingMovies: async () => {
+    const response = await apiClient.get('/movies', { params: { status: 'UPCOMING' } });
+    return response.data;
+  },
+
+  /**
+   * Get now playing movies
+   * @returns {Promise<Array>} List of now playing movies
+   */
+  getNowPlayingMovies: async () => {
+    const response = await apiClient.get('/movies', { params: { status: 'NOW_PLAYING' } });
+    return response.data;
+  },
+
+  /**
+   * Get all movie genres
+   * @returns {Promise<Array>} List of genres
+   */
+  getGenres: async () => {
+    const response = await apiClient.get('/movies/genres');
+    return response.data;
+  },
+
+  /**
+   * Create a new movie (Admin only)
+   * @param {Object} movieData - Movie data
+   * @returns {Promise<Object>} Created movie
+   */
+  createMovie: async (movieData) => {
+    const response = await apiClient.post('/movies', movieData);
+    return response.data;
+  },
+
+  /**
+   * Update a movie (Admin only)
+   * @param {number|string} id - Movie ID
+   * @param {Object} movieData - Updated movie data
+   * @returns {Promise<Object>} Updated movie
+   */
+  updateMovie: async (id, movieData) => {
+    const response = await apiClient.put(`/movies/${id}`, movieData);
+    return response.data;
+  },
+
+  /**
+   * Delete a movie (Admin only)
+   * @param {number|string} id - Movie ID
    * @returns {Promise<Object>} Response
    */
-  changePassword: async (passwordData) => {
-    const response = await apiClient.post('/user/change-password', passwordData);
+  deleteMovie: async (id) => {
+    const response = await apiClient.delete(`/movies/${id}`);
     return response.data;
   },
 
   /**
-   * Request password reset
-   * @param {Object} data - Password reset request data
-   * @param {string} data.email - User email
-   * @returns {Promise<Object>} Response
+   * Get screenings for a movie
+   * @param {number|string} id - Movie ID
+   * @param {number} [days=7] - Number of days to include
+   * @returns {Promise<Object>} Movie screenings
    */
-  requestPasswordReset: async (data) => {
-    const response = await apiClient.post('/auth/forgot-password', data);
-    return response.data;
-  },
-
-  /**
-   * Reset password with token
-   * @param {Object} data - Password reset data
-   * @param {string} data.token - Reset token
-   * @param {string} data.newPassword - New password
-   * @returns {Promise<Object>} Response
-   */
-  resetPassword: async (data) => {
-    const response = await apiClient.post('/auth/reset-password', data);
+  getMovieScreenings: async (id, days = 7) => {
+    const response = await apiClient.get(`/movies/${id}/screenings`, { params: { days } });
     return response.data;
   }
 };
 
-export default authApi;
+export default movieApi;

@@ -5,12 +5,12 @@
 /* Base styles */
 @layer base {
   html {
-    @apply text-gray-900 antialiased;
+    @apply text-neutral-900 antialiased;
     scroll-behavior: smooth;
   }
   
   body {
-    @apply bg-gray-50;
+    @apply bg-neutral-50;
   }
   
   h1, h2, h3, h4, h5, h6 {
@@ -18,7 +18,7 @@
   }
   
   a {
-    @apply text-primary-600 hover:text-primary-700;
+    @apply text-blue-600 hover:text-blue-700;
   }
 }
 
@@ -29,12 +29,12 @@
   .form-textarea,
   .form-select,
   .form-multiselect {
-    @apply block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm;
+    @apply block w-full rounded-md border-neutral-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm;
   }
   
   .form-checkbox,
   .form-radio {
-    @apply h-4 w-4 text-primary-600 border-gray-300 focus:ring-primary-500;
+    @apply h-4 w-4 text-blue-600 border-neutral-300 focus:ring-blue-500;
   }
   
   /* Container with responsive padding */
@@ -58,15 +58,15 @@
   }
   
   .btn-primary {
-    @apply bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
+    @apply bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500;
   }
   
   .btn-secondary {
-    @apply bg-secondary-600 text-white hover:bg-secondary-700 focus:ring-secondary-500;
+    @apply bg-pink-600 text-white hover:bg-pink-700 focus:ring-pink-500;
   }
   
   .btn-outline {
-    @apply border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:ring-primary-500;
+    @apply border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 focus:ring-blue-500;
   }
   
   .btn-danger {
@@ -147,13 +147,13 @@
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-gray-100;
+  @apply bg-neutral-100;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-gray-400 rounded-full;
+  @apply bg-neutral-400 rounded-full;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-500;
+  @apply bg-neutral-500;
 }
