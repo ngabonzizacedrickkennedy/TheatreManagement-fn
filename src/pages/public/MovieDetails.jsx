@@ -82,7 +82,7 @@ const MovieDetailsPage = () => {
             
             {movie.trailerUrl && (
               <div className="mt-6">
-                
+                <a
                   href={movie.trailerUrl}
                   target="_blank"
                   rel="noopener noreferrer"
