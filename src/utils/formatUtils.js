@@ -68,6 +68,38 @@ export const formatDate = (date, options = {}) => {
   };
   
   /**
+   * Format time string 
+   * @param {string} timeString - Time string to format (HH:mm:ss)
+   * @returns {string} Formatted time (e.g., "2:30 PM")
+   */
+  export const formatTime = (timeString) => {
+    if (!timeString) return '';
+    
+    try {
+      // If the input is just a time string (HH:mm:ss), create a full date string
+      const fullDateTimeString = timeString.includes('T') ? 
+        timeString : 
+        `2000-01-01T${timeString}`;
+      
+      const date = new Date(fullDateTimeString);
+      
+      // Check if it's a valid date
+      if (isNaN(date.getTime())) {
+        return timeString; // Return original string if parsing fails
+      }
+      
+      return date.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch (error) {
+      console.error('Error formatting time:', error);
+      return timeString;
+    }
+  };
+  
+  /**
    * Format currency amount
    * @param {number} amount - Amount to format
    * @param {string} [currency='USD'] - Currency code

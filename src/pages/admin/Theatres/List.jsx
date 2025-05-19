@@ -1,7 +1,6 @@
-// src/pages/admin/Theatres.jsx
+// src/pages/admin/Theatres/List.jsx
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useTheatres } from '@hooks/useTheatres';
 import { useToast } from '@contexts/ToastContext';
 import Button from '@components/common/Button';
 import LoadingSpinner from '@components/common/LoadingSpinner';
@@ -10,6 +9,7 @@ import {
   MagnifyingGlassIcon,
   PencilSquareIcon,
   TrashIcon,
+  ExclamationCircleIcon,
   BuildingStorefrontIcon,
   MapPinIcon,
   PhoneIcon,
@@ -17,40 +17,60 @@ import {
   ArrowsUpDownIcon
 } from '@heroicons/react/24/outline';
 
-const AdminTheatresPage = () => {
+// Mock theatre data since we don't have a real theatres API hook
+const MOCK_THEATRES = [
+  {
+    id: 1, 
+    name: 'Downtown Cinema',
+    address: '123 Main Street, Anytown, ST 12345',
+    phoneNumber: '+1 555-123-4567',
+    email: 'downtown@theatrecinema.com',
+    description: 'Our flagship theatre located in the heart of downtown.',
+    totalScreens: 8,
+    imageUrl: 'https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=800&q=80'
+  },
+  {
+    id: 2,
+    name: 'Westside Theatre',
+    address: '456 West Avenue, Anytown, ST 12345',
+    phoneNumber: '+1 555-987-6543',
+    email: 'westside@theatrecinema.com',
+    description: 'A modern theatre with IMAX screens and luxury seating.',
+    totalScreens: 6,
+    imageUrl: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=800&q=80'
+  },
+  {
+    id: 3,
+    name: 'North Plaza Cinema',
+    address: '789 North Boulevard, Anytown, ST 12345',
+    phoneNumber: '+1 555-789-0123',
+    email: 'northplaza@theatrecinema.com',
+    description: 'A family-friendly theatre with arcade and food court.',
+    totalScreens: 5,
+    imageUrl: 'https://images.unsplash.com/photo-1440404653325-ab127d49abc1?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=800&q=80'
+  }
+];
+
+const TheatreList = () => {
   const { showSuccess, showError } = useToast();
   
   // State for search and sorting
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('name');
   const [sortOrder, setSortOrder] = useState('asc');
+  const [isLoading, setIsLoading] = useState(false);
+  const [theatres, setTheatres] = useState(MOCK_THEATRES);
   
-  // Get theatres data
-  const { useGetTheatres, useDeleteTheatre } = useTheatres();
-  const {
-    data: theatres = [],
-    isLoading: isLoadingTheatres,
-    refetch: refetchTheatres
-  } = useGetTheatres();
-  
-  // Delete theatre mutation
-  const {
-    mutate: deleteTheatre,
-    isPending: isDeleting
-  } = useDeleteTheatre({
-    onSuccess: () => {
-      showSuccess('Theatre deleted successfully');
-      refetchTheatres();
-    },
-    onError: (error) => {
-      showError(error.message || 'Failed to delete theatre');
-    }
-  });
-  
-  // Handle theatre deletion
+  // Mock delete function
   const handleDeleteTheatre = (id) => {
     if (window.confirm('Are you sure you want to delete this theatre?')) {
-      deleteTheatre(id);
+      setIsLoading(true);
+      // Simulate API call
+      setTimeout(() => {
+        setTheatres(theatres.filter(theatre => theatre.id !== id));
+        setIsLoading(false);
+        showSuccess('Theatre deleted successfully');
+      }, 1000);
     }
   };
   
@@ -101,7 +121,7 @@ const AdminTheatresPage = () => {
       return sortOrder === 'asc' ? comparison : -comparison;
     });
   
-  if (isLoadingTheatres) {
+  if (isLoading) {
     return <LoadingSpinner />;
   }
   
@@ -165,6 +185,10 @@ const AdminTheatresPage = () => {
                     className="h-full w-full object-cover" 
                     src={theatre.imageUrl} 
                     alt={theatre.name} 
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = '/path/to/placeholder-image.jpg';
+                    }}
                   />
                 ) : (
                   <div className="h-full w-full flex items-center justify-center">
@@ -177,19 +201,19 @@ const AdminTheatresPage = () => {
               <div className="p-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-2">{theatre.name}</h2>
                 <div className="space-y-2 mb-4">
-                  <div className="flex items-start text-sm text-gray-600">
-                    <MapPinIcon className="h-5 w-5 text-gray-400 mr-2 mt-0.5 flex-shrink-0" />
-                    <span>{theatre.address}</span>
+                  <div className="flex items-start">
+                    <MapPinIcon className="h-5 w-5 text-gray-400 mt-0.5 mr-2 flex-shrink-0" />
+                    <span className="text-sm text-gray-600">{theatre.address}</span>
                   </div>
                   
-                  <div className="flex items-center text-sm text-gray-600">
+                  <div className="flex items-center">
                     <PhoneIcon className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0" />
-                    <span>{theatre.phoneNumber}</span>
+                    <span className="text-sm text-gray-600">{theatre.phoneNumber}</span>
                   </div>
                   
-                  <div className="flex items-center text-sm text-gray-600">
+                  <div className="flex items-center">
                     <EnvelopeIcon className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0" />
-                    <span>{theatre.email}</span>
+                    <span className="text-sm text-gray-600">{theatre.email}</span>
                   </div>
                 </div>
                 
@@ -231,13 +255,12 @@ const AdminTheatresPage = () => {
                     </Button>
                   </Link>
                   
-                  <Button
-                    variant="danger"
-                    size="sm"
+                  <Button 
+                    variant="danger" 
+                    size="sm" 
                     className="flex-1"
                     icon={<TrashIcon className="h-4 w-4 mr-1" />}
                     onClick={() => handleDeleteTheatre(theatre.id)}
-                    disabled={isDeleting}
                   >
                     Delete
                   </Button>
@@ -247,16 +270,29 @@ const AdminTheatresPage = () => {
           ))}
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow p-6 text-center">
-          <BuildingStorefrontIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+        <div className="bg-white rounded-lg shadow p-12 text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
+            <ExclamationCircleIcon className="h-8 w-8 text-gray-400" />
+          </div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">No theatres found</h3>
-          <p className="text-gray-600">
-            {searchQuery ? 'Try adjusting your search query' : 'Get started by adding a new theatre'}
+          <p className="text-gray-500 mb-6">
+            {searchQuery
+              ? 'No theatres match your search criteria. Try adjusting your search.'
+              : 'There are no theatres in the system yet. Add your first theatre to get started.'
+            }
           </p>
+          <Link to="/admin/theatres/create">
+            <Button 
+              variant="primary"
+              icon={<PlusIcon className="h-5 w-5 mr-2" />}
+            >
+              Add Theatre
+            </Button>
+          </Link>
         </div>
       )}
     </div>
   );
 };
 
-export default AdminTheatresPage;
+export default TheatreList;

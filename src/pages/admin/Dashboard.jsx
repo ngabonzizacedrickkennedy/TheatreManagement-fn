@@ -51,7 +51,7 @@ const AdminDashboardPage = () => {
   });
   
   // Hooks for fetching data
-  const { useGetAllMovies } = useMovies();
+  const { useGetMovies } = useMovies();
   const { useGetAllBookings } = useBookings();
   const { useGetUpcomingScreenings } = useScreenings();
   
@@ -59,7 +59,7 @@ const AdminDashboardPage = () => {
   const { 
     data: movies = [], 
     isLoading: isLoadingMovies 
-  } = useGetAllMovies();
+  } = useGetMovies();
   
   // Get bookings
   const { 

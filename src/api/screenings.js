@@ -1,4 +1,3 @@
-// src/api/screenings.js
 import apiClient from './client';
 
 /**
@@ -79,6 +78,40 @@ const screeningApi = {
   getUpcomingScreenings: async (days = 7) => {
     const response = await apiClient.get('/screenings/upcoming', {
       params: { days }
+    });
+    return response.data;
+  },
+
+  /**
+   * Get screenings for movie and theatre
+   * @param {number|string} movieId - Movie ID
+   * @param {number|string} theatreId - Theatre ID
+   * @returns {Promise<Array>} List of screenings
+   */
+  getScreeningsByMovieAndTheatre: async (movieId, theatreId) => {
+    const response = await apiClient.get('/admin/screenings', {
+      params: { movieId, theatreId }
+    });
+    return response.data;
+  },
+
+  /**
+   * Get available screenings
+   * @param {number|string} movieId - Movie ID
+   * @param {number|string} theatreId - Theatre ID
+   * @param {Date|string} startDate - Start date
+   * @returns {Promise<Array>} List of available screenings
+   */
+  getAvailableScreenings: async (movieId, theatreId, startDate) => {
+    const formattedStartDate = formatDateParam(startDate);
+    
+    const response = await apiClient.get('/admin/screenings', {
+      params: { 
+        movieId, 
+        theatreId, 
+        startDate: formattedStartDate,
+        available: true
+      }
     });
     return response.data;
   },
