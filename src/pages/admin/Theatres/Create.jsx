@@ -1,9 +1,11 @@
-import { useState } from 'react';
+// src/pages/admin/Theatres/Create.jsx
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTheatres } from '@hooks/useTheatres';
+import { useForm } from 'react-hook-form';
+import { useCreateTheatre } from '@hooks/useTheatres'; // Changed import to use the specific hook
 import { useToast } from '@contexts/ToastContext';
-import { useForm } from '@hooks/useForm';
 import Button from '@components/common/Button';
+import Input from '@components/common/Input';
 import LoadingSpinner from '@components/common/LoadingSpinner';
 import {
   BuildingStorefrontIcon,
@@ -16,11 +18,8 @@ import {
 const CreateTheatrePage = () => {
   const navigate = useNavigate();
   const { showSuccess, showError } = useToast();
-  const { useCreateTheatre } = useTheatres();
-  
-  // Form state
-  const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Form validation rules
   const validationRules = {
@@ -34,61 +33,60 @@ const CreateTheatrePage = () => {
   
   // Initialize form
   const {
-    values,
-    errors,
-    touched,
-    handleChange,
-    handleBlur,
+    register,
     handleSubmit,
-    isSubmitting,
-    resetForm
+    formState: { errors },
+    setValue,
+    watch
   } = useForm({
-    initialValues: {
+    defaultValues: {
       name: '',
       address: '',
       phoneNumber: '',
       email: '',
       description: '',
-      totalScreens: 1
-    },
-    validationRules,
-    onSubmit: async (values) => {
-      try {
-        // Create FormData for file upload
-        const formData = new FormData();
-        Object.keys(values).forEach(key => {
-          formData.append(key, values[key]);
-        });
-        if (imageFile) {
-          formData.append('image', imageFile);
-        }
-        
-        // Create theatre
-        await createTheatre(formData);
-        showSuccess('Theatre created successfully');
-        navigate('/admin/theatres');
-      } catch (error) {
-        showError(error.message || 'Failed to create theatre');
-      }
+      totalScreens: 1,
+      imageUrl: ''
     }
   });
   
-  // Create theatre mutation
-  const {
-    mutate: createTheatre,
-    isPending: isCreating
-  } = useCreateTheatre();
+  // Watch image URL for preview
+  const imageUrl = watch('imageUrl');
   
-  // Handle image file change
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result);
-      };
-      reader.readAsDataURL(file);
+  // Update image preview when URL changes
+  useEffect(() => {
+    if (imageUrl) {
+      setImagePreview(imageUrl);
+    } else {
+      setImagePreview('');
+    }
+  }, [imageUrl]);
+  
+  // Create theatre mutation
+  const { mutate: createTheatre, isPending: isCreating } = useCreateTheatre({
+    onSuccess: (data) => {
+      showSuccess('Theatre created successfully');
+      navigate(`/admin/theatres/${data.id}`);
+    },
+    onError: (error) => {
+      showError(error.message || 'Failed to create theatre');
+      setIsSubmitting(false);
+    }
+  });
+  
+  // Form submission handler
+  const onSubmit = async (data) => {
+    setIsSubmitting(true);
+    
+    try {
+      // Convert string to number for total screens
+      data.totalScreens = Number(data.totalScreens);
+      
+      // Create theatre
+      createTheatre(data);
+    } catch (error) {
+      showError(error.message || 'Failed to create theatre');
+      setIsSubmitting(false);
     }
   };
   
@@ -115,48 +113,54 @@ const CreateTheatrePage = () => {
         </Button>
       </div>
       
-      <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow">
+      <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-lg shadow">
         <div className="p-6 space-y-6">
-          {/* Theatre Image */}
+          {/* Theatre Image URL */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Theatre Image
+            <label htmlFor="imageUrl" className="block text-sm font-medium text-gray-700 mb-1">
+              Theatre Image URL
             </label>
-            <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
-              <div className="space-y-1 text-center">
-                {imagePreview ? (
-                  <div className="mb-4">
-                    <img
-                      src={imagePreview}
-                      alt="Theatre preview"
-                      className="mx-auto h-32 w-32 object-cover rounded-lg"
-                    />
-                  </div>
-                ) : (
-                  <PhotoIcon className="mx-auto h-12 w-12 text-gray-400" />
-                )}
-                <div className="flex text-sm text-gray-600">
-                  <label
-                    htmlFor="image"
-                    className="relative cursor-pointer bg-white rounded-md font-medium text-primary-600 hover:text-primary-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary-500"
-                  >
-                    <span>Upload a file</span>
-                    <input
-                      id="image"
-                      name="image"
-                      type="file"
-                      accept="image/*"
-                      className="sr-only"
-                      onChange={handleImageChange}
-                    />
-                  </label>
-                  <p className="pl-1">or drag and drop</p>
-                </div>
-                <p className="text-xs text-gray-500">
-                  PNG, JPG, GIF up to 10MB
-                </p>
+            <div className="mt-1 relative rounded-md shadow-sm">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <PhotoIcon className="h-5 w-5 text-gray-400" />
               </div>
+              <input
+                type="text"
+                id="imageUrl"
+                placeholder="https://example.com/image.jpg"
+                className={`pl-10 block w-full rounded-md shadow-sm sm:text-sm ${
+                  errors.imageUrl
+                    ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
+                    : 'border-gray-300 focus:ring-primary-500 focus:border-primary-500'
+                }`}
+                {...register('imageUrl', {
+                  pattern: {
+                    value: /^(https?:\/\/[\w.-]+(\.[a-z]{2,})?(\/\S*)?|data:image\/(jpeg|png|gif);base64,[a-zA-Z0-9+/]+={0,2})$/i,
+                    message: 'Please enter a valid URL or Base64 image data'
+                  }
+                })}
+              />
             </div>
+            {errors.imageUrl && (
+              <p className="mt-1 text-sm text-red-600">{errors.imageUrl.message}</p>
+            )}
+            
+            {/* Image preview */}
+            {imagePreview && (
+              <div className="mt-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Image Preview
+                </label>
+                <div className="mt-1 h-48 max-w-xs bg-gray-100 rounded-md overflow-hidden">
+                  <img 
+                    src={imagePreview}
+                    alt="Theatre preview" 
+                    className="h-full w-full object-cover" 
+                    onError={() => setImagePreview('')}
+                  />
+                </div>
+              </div>
+            )}
           </div>
           
           {/* Theatre Name */}
@@ -171,19 +175,22 @@ const CreateTheatrePage = () => {
               <input
                 type="text"
                 id="name"
-                name="name"
-                value={values.name}
-                onChange={handleChange}
-                onBlur={handleBlur}
                 className={`pl-10 block w-full rounded-md shadow-sm sm:text-sm ${
-                  errors.name && touched.name
+                  errors.name
                     ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
                     : 'border-gray-300 focus:ring-primary-500 focus:border-primary-500'
                 }`}
+                {...register('name', { 
+                  required: 'Theatre name is required',
+                  minLength: {
+                    value: 3,
+                    message: 'Theatre name must be at least 3 characters'
+                  }
+                })}
               />
             </div>
-            {errors.name && touched.name && (
-              <p className="mt-1 text-sm text-red-600">{errors.name}</p>
+            {errors.name && (
+              <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
             )}
           </div>
           
@@ -200,18 +207,18 @@ const CreateTheatrePage = () => {
                 id="address"
                 name="address"
                 rows={3}
-                value={values.address}
-                onChange={handleChange}
-                onBlur={handleBlur}
                 className={`pl-10 block w-full rounded-md shadow-sm sm:text-sm ${
-                  errors.address && touched.address
+                  errors.address
                     ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
                     : 'border-gray-300 focus:ring-primary-500 focus:border-primary-500'
                 }`}
+                {...register('address', { 
+                  required: 'Address is required'
+                })}
               />
             </div>
-            {errors.address && touched.address && (
-              <p className="mt-1 text-sm text-red-600">{errors.address}</p>
+            {errors.address && (
+              <p className="mt-1 text-sm text-red-600">{errors.address.message}</p>
             )}
           </div>
           
@@ -228,18 +235,22 @@ const CreateTheatrePage = () => {
                 type="tel"
                 id="phoneNumber"
                 name="phoneNumber"
-                value={values.phoneNumber}
-                onChange={handleChange}
-                onBlur={handleBlur}
                 className={`pl-10 block w-full rounded-md shadow-sm sm:text-sm ${
-                  errors.phoneNumber && touched.phoneNumber
+                  errors.phoneNumber
                     ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
                     : 'border-gray-300 focus:ring-primary-500 focus:border-primary-500'
                 }`}
+                {...register('phoneNumber', {
+                  required: 'Phone number is required',
+                  pattern: {
+                    value: /^\+?[\d\s-()]+$/,
+                    message: 'Please enter a valid phone number'
+                  }
+                })}
               />
             </div>
-            {errors.phoneNumber && touched.phoneNumber && (
-              <p className="mt-1 text-sm text-red-600">{errors.phoneNumber}</p>
+            {errors.phoneNumber && (
+              <p className="mt-1 text-sm text-red-600">{errors.phoneNumber.message}</p>
             )}
           </div>
           
@@ -256,18 +267,22 @@ const CreateTheatrePage = () => {
                 type="email"
                 id="email"
                 name="email"
-                value={values.email}
-                onChange={handleChange}
-                onBlur={handleBlur}
                 className={`pl-10 block w-full rounded-md shadow-sm sm:text-sm ${
-                  errors.email && touched.email
+                  errors.email
                     ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
                     : 'border-gray-300 focus:ring-primary-500 focus:border-primary-500'
                 }`}
+                {...register('email', {
+                  required: 'Email is required',
+                  pattern: {
+                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                    message: 'Please enter a valid email address'
+                  }
+                })}
               />
             </div>
-            {errors.email && touched.email && (
-              <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+            {errors.email && (
+              <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
             )}
           </div>
           
@@ -280,17 +295,21 @@ const CreateTheatrePage = () => {
               id="description"
               name="description"
               rows={4}
-              value={values.description}
-              onChange={handleChange}
-              onBlur={handleBlur}
               className={`block w-full rounded-md shadow-sm sm:text-sm ${
-                errors.description && touched.description
+                errors.description
                   ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
                   : 'border-gray-300 focus:ring-primary-500 focus:border-primary-500'
               }`}
+              {...register('description', {
+                required: 'Description is required',
+                minLength: {
+                  value: 10,
+                  message: 'Description must be at least 10 characters long'
+                }
+              })}
             />
-            {errors.description && touched.description && (
-              <p className="mt-1 text-sm text-red-600">{errors.description}</p>
+            {errors.description && (
+              <p className="mt-1 text-sm text-red-600">{errors.description.message}</p>
             )}
           </div>
           
@@ -305,17 +324,25 @@ const CreateTheatrePage = () => {
               name="totalScreens"
               min="1"
               max="20"
-              value={values.totalScreens}
-              onChange={handleChange}
-              onBlur={handleBlur}
               className={`block w-full rounded-md shadow-sm sm:text-sm ${
-                errors.totalScreens && touched.totalScreens
+                errors.totalScreens
                   ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
                   : 'border-gray-300 focus:ring-primary-500 focus:border-primary-500'
               }`}
+              {...register('totalScreens', {
+                required: 'Total screens is required',
+                min: {
+                  value: 1,
+                  message: 'Theatre must have at least 1 screen'
+                },
+                max: {
+                  value: 20,
+                  message: 'Theatre cannot have more than 20 screens'
+                }
+              })}
             />
-            {errors.totalScreens && touched.totalScreens && (
-              <p className="mt-1 text-sm text-red-600">{errors.totalScreens}</p>
+            {errors.totalScreens && (
+              <p className="mt-1 text-sm text-red-600">{errors.totalScreens.message}</p>
             )}
           </div>
         </div>
@@ -333,6 +360,7 @@ const CreateTheatrePage = () => {
             type="submit"
             variant="primary"
             disabled={isSubmitting || isCreating}
+            loading={isSubmitting || isCreating}
           >
             Create Theatre
           </Button>
@@ -342,4 +370,4 @@ const CreateTheatrePage = () => {
   );
 };
 
-export default CreateTheatrePage; 
+export default CreateTheatrePage;

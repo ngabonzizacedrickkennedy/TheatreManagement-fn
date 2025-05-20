@@ -1,122 +1,102 @@
+// src/hooks/useTheatres.js
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import  theatreApi  from '@api/theatres';
+import theatreApi from '@api/theatres';
 
-// Get all theatres
-export const useGetTheatres = () => {
+/**
+ * Custom hook to get all theatres
+ */
+export const useGetTheatres = (options = {}) => {
   return useQuery({
     queryKey: ['theatres'],
-    queryFn: async () => {
-      const response = await theatreApi.get('/theatres');
-      return response.data;
-    }
+    queryFn: () => theatreApi.getAllTheatres(),
+    ...options
   });
 };
 
-// Get a single theatre by ID
-export const useGetTheatre = (id) => {
+/**
+ * Custom hook to get a single theatre by ID
+ */
+export const useGetTheatre = (id, options = {}) => {
   return useQuery({
     queryKey: ['theatres', id],
-    queryFn: async () => {
-      const response = await theatreApi.get(`/theatres/${id}`);
-      return response.data;
-    },
-    enabled: !!id
+    queryFn: () => theatreApi.getTheatreById(id),
+    enabled: !!id,
+    ...options
   });
 };
 
-// Create a new theatre
-export const useCreateTheatre = () => {
+/**
+ * Custom hook to create a new theatre
+ */
+export const useCreateTheatre = (options = {}) => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async (theatreData) => {
-      const response = await theatreApi.post('/theatres', theatreData);
-      return response.data;
-    },
+    mutationFn: (theatreData) => theatreApi.createTheatre(theatreData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['theatres'] });
-    }
+    },
+    ...options
   });
 };
 
-// Update a theatre
-export const useUpdateTheatre = () => {
+/**
+ * Custom hook to update a theatre
+ */
+export const useUpdateTheatre = (options = {}) => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ id, theatreData }) => {
-      const response = await theatreApi.put(`/theatres/${id}`, theatreData);
-      return response.data;
-    },
+    mutationFn: ({ id, theatreData }) => theatreApi.updateTheatre(id, theatreData),
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['theatres'] });
       queryClient.invalidateQueries({ queryKey: ['theatres', variables.id] });
-    }
+    },
+    ...options
   });
 };
 
-// Delete a theatre
-export const useDeleteTheatre = () => {
+/**
+ * Custom hook to delete a theatre
+ */
+export const useDeleteTheatre = (options = {}) => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async (id) => {
-      const response = await theatreApi.delete(`/theatres/${id}`);
-      return response.data;
-    },
+    mutationFn: (id) => theatreApi.deleteTheatre(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['theatres'] });
-    }
-  });
-};
-
-// Get theatre seats
-export const useGetTheatreSeats = (theatreId) => {
-  return useQuery({
-    queryKey: ['theatres', theatreId, 'seats'],
-    queryFn: async () => {
-      const response = await theatreApi.get(`/theatres/${theatreId}/seats`);
-      return response.data;
     },
-    enabled: !!theatreId
+    ...options
   });
 };
 
-// Update theatre seats
-export const useUpdateTheatreSeats = () => {
+/**
+ * Custom hook to get theatre seats
+ */
+export const useGetTheatreSeats = (theatreId, screenNumber, options = {}) => {
+  return useQuery({
+    queryKey: ['theatres', theatreId, 'screens', screenNumber, 'seats'],
+    queryFn: () => theatreApi.getSeatsByTheatreAndScreen(theatreId, screenNumber),
+    enabled: !!theatreId && !!screenNumber,
+    ...options
+  });
+};
+
+/**
+ * Custom hook to update theatre seats
+ */
+export const useUpdateTheatreSeats = (options = {}) => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ theatreId, seatsData }) => {
-      const response = await theatreApi.put(`/theatres/${theatreId}/seats`, seatsData);
-      return response.data;
-    },
+    mutationFn: ({ theatreId, screenNumber, seatsData }) => 
+      theatreApi.updateSeats(theatreId, screenNumber, seatsData),
     onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['theatres', variables.theatreId, 'seats'] });
-    }
-  });
-};
-
-// Get theatre screenings
-export const useGetTheatreScreenings = (theatreId) => {
-  return useQuery({
-    queryKey: ['theatres', theatreId, 'screenings'],
-    queryFn: async () => {
-      const response = await theatreApi.get(`/theatres/${theatreId}/screenings`);
-      return response.data;
+      queryClient.invalidateQueries({ 
+        queryKey: ['theatres', variables.theatreId, 'screens', variables.screenNumber, 'seats'] 
+      });
     },
-    enabled: !!theatreId
+    ...options
   });
 };
-
-// Export all hooks
-export const useTheatres = {
-  useGetTheatres,
-  useGetTheatre,
-  useCreateTheatre,
-  useUpdateTheatre,
-  useDeleteTheatre,
-  useGetTheatreSeats,
-  useUpdateTheatreSeats,
-  useGetTheatreScreenings
-}; 
