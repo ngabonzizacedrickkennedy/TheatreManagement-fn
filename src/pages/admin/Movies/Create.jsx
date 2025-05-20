@@ -15,8 +15,19 @@ const CreateMoviePage = () => {
   const [imagePreview, setImagePreview] = useState('');
   
   // Get genres for the dropdown
-  const { useGetGenres, useCreateMovie } = useMovies();
-  const { data: genres = [], isLoading: isLoadingGenres } = useGetGenres();
+  const { useCreateMovie } = useMovies();
+  const genres = [
+    { id: 1, name: "Action" },
+    { id: 2, name: "Comedy" },
+    { id: 3, name: "Drama" },
+    { id: 4, name: "Fantasy" },
+    { id: 5, name: "Horror" },
+    { id: 6, name: "Romance" },
+    { id: 7, name: "Sci-Fi" },
+    { id: 8, name: "Thriller" },
+    { id: 9, name: "Animation" },
+    { id: 10, name: "Documentary" },
+  ];
   
   
   // Create movie mutation
@@ -74,10 +85,6 @@ const CreateMoviePage = () => {
   
   // Movie ratings options
   const ratings = ['G', 'PG', 'PG-13', 'R', 'NC-17', 'NR'];
-   // Loading state
-   if (isLoadingGenres) {
-    return <LoadingSpinner />;
-  }
   
   return (
     <div>
