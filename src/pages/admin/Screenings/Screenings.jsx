@@ -1,10 +1,11 @@
 // src/pages/admin/Screenings/Screenings.jsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useScreenings } from '@hooks/useScreenings';
 import { useMovies } from '@hooks/useMovies';
+import { useGetTheatres } from '@hooks/useTheatres';  // Import theatres hook directly
 import { useToast } from '@contexts/ToastContext';
-import { formatDate, formatEnumValue } from '@utils/formatUtils';
+import { formatDate, formatEnumValue, formatCurrency } from '@utils/formatUtils';
 import Button from '@components/common/Button';
 import LoadingSpinner from '@components/common/LoadingSpinner';
 import {
@@ -31,10 +32,14 @@ const ScreeningsPage = () => {
   const [sortBy, setSortBy] = useState('startTime');
   const [sortOrder, setSortOrder] = useState('asc');
   
+  // Get all theatres for filter dropdown
+  const { data: theatresData = [], isLoading: isLoadingTheatres } = useGetTheatres();
+  const theatres = Array.isArray(theatresData) ? theatresData : [];
+  
   // Get screenings with optional filters
   const { useGetScreenings, useGetScreeningFormats, useDeleteScreening } = useScreenings();
   const { 
-    data: screeningsData = { screenings: [], movies: [], theatres: [] }, 
+    data: screeningsData = [], 
     isLoading: isLoadingScreenings,
     refetch: refetchScreenings
   } = useGetScreenings({
@@ -43,21 +48,47 @@ const ScreeningsPage = () => {
     date: selectedDate || undefined
   });
   
-  // Destructure screenings data
-  const { screenings = [], movies = [], theatres = [] } = screeningsData;
+  // Ensure screenings is always an array by checking data structure
+  const [screenings, setScreenings] = useState([]);
+  
+  // Process screenings data when it changes
+  useEffect(() => {
+    if (screeningsData) {
+      // Handle different possible response formats
+      if (Array.isArray(screeningsData)) {
+        setScreenings(screeningsData);
+      } else if (screeningsData && typeof screeningsData === 'object') {
+        // If it's an object, check for a screenings property
+        if (Array.isArray(screeningsData.screenings)) {
+          setScreenings(screeningsData.screenings);
+        } else {
+          // If no screenings property, try to convert object to array of values
+          const extractedScreenings = Object.values(screeningsData).filter(item => item && typeof item === 'object');
+          setScreenings(extractedScreenings);
+        }
+      } else {
+        // Fallback to empty array
+        setScreenings([]);
+      }
+    } else {
+      setScreenings([]);
+    }
+  }, [screeningsData]);
   
   // Get screening formats
   const {
-    data: formats = [],
+    data: formatsData = [],
     isLoading: isLoadingFormats
   } = useGetScreeningFormats();
+  const formats = Array.isArray(formatsData) ? formatsData : [];
   
   // Get all movies for filter dropdown
   const { useGetMovies } = useMovies();
   const {
-    data: allMovies = [],
+    data: moviesData = [],
     isLoading: isLoadingMovies
   } = useGetMovies();
+  const movies = Array.isArray(moviesData) ? moviesData : [];
   
   // Delete screening mutation
   const {
@@ -120,36 +151,51 @@ const ScreeningsPage = () => {
     setSelectedDate('');
   };
   
-  // Filter and sort screenings
+  // Filter and sort screenings safely
   const filteredScreenings = screenings
     .filter(screening => {
+      if (!screening) return false;
+      
+      // Safely access properties that might not exist
+      const movieTitle = screening.movieTitle || '';
+      const theatreName = screening.theatreName || '';
+      
       // Search filter for movie title or theatre name
       return searchQuery === '' || 
-        screening.movieTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        screening.theatreName.toLowerCase().includes(searchQuery.toLowerCase());
+        movieTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        theatreName.toLowerCase().includes(searchQuery.toLowerCase());
     })
     .sort((a, b) => {
+      // Handle null/undefined values safely
+      if (!a || !b) return 0;
+      
       // Sort by selected field
       let comparison = 0;
       
       switch (sortBy) {
         case 'movieTitle':
-          comparison = a.movieTitle.localeCompare(b.movieTitle);
+          comparison = (a.movieTitle || '').localeCompare(b.movieTitle || '');
           break;
         case 'theatreName':
-          comparison = a.theatreName.localeCompare(b.theatreName);
+          comparison = (a.theatreName || '').localeCompare(b.theatreName || '');
           break;
         case 'startTime':
-          comparison = new Date(a.startTime) - new Date(b.startTime);
+          const aTime = a.startTime ? new Date(a.startTime) : new Date(0);
+          const bTime = b.startTime ? new Date(b.startTime) : new Date(0);
+          comparison = aTime - bTime;
           break;
         case 'format':
           comparison = (a.format || '').localeCompare(b.format || '');
           break;
         case 'basePrice':
-          comparison = a.basePrice - b.basePrice;
+          const aPrice = a.basePrice || 0;
+          const bPrice = b.basePrice || 0;
+          comparison = aPrice - bPrice;
           break;
         default:
-          comparison = new Date(a.startTime) - new Date(b.startTime);
+          const aDefaultTime = a.startTime ? new Date(a.startTime) : new Date(0);
+          const bDefaultTime = b.startTime ? new Date(b.startTime) : new Date(0);
+          comparison = aDefaultTime - bDefaultTime;
       }
       
       // Apply sort order
@@ -160,9 +206,13 @@ const ScreeningsPage = () => {
   const today = new Date().toISOString().split('T')[0];
   
   // Loading state
-  if (isLoadingScreenings || isLoadingFormats || isLoadingMovies) {
+  if (isLoadingScreenings || isLoadingFormats || isLoadingMovies || isLoadingTheatres) {
     return <LoadingSpinner />;
   }
+  
+  // Debug info - this would be removed in production but helps diagnose issues
+  console.log('Screenings data structure:', screeningsData);
+  console.log('Processed screenings:', screenings);
   
   return (
     <div>
@@ -374,27 +424,27 @@ const ScreeningsPage = () => {
                   <tr key={screening.id}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">
-                        {screening.movieTitle}
+                        {screening.movieTitle || 'Unknown Movie'}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{screening.theatreName}</div>
+                      <div className="text-sm text-gray-900">{screening.theatreName || 'Unknown Theatre'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        {formatDate(screening.startTime)}
+                        {screening.startTime ? formatDate(screening.startTime) : 'No date'}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {screening.screenNumber}
+                      {screening.screenNumber || 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                        {formatEnumValue(screening.format)}
+                        {screening.format ? formatEnumValue(screening.format) : 'Standard'}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      ${screening.basePrice?.toFixed(2) || '0.00'}
+                      ${(screening.basePrice || 0).toFixed(2)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end space-x-2">

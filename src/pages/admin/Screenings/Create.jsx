@@ -1,9 +1,10 @@
-// src/pages/admin/screenings/Create.jsx
+// src/pages/admin/Screenings/Create.jsx
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useScreenings } from '@hooks/useScreenings';
 import { useMovies } from '@hooks/useMovies';
+import { useGetTheatres } from '@hooks/useTheatres'; // Import theatres hook directly
 import { useToast } from '@contexts/ToastContext';
 import Button from '@components/common/Button';
 import Input from '@components/common/Input';
@@ -12,23 +13,34 @@ import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 
 const CreateScreeningPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { showSuccess, showError } = useToast();
   const [selectedMovie, setSelectedMovie] = useState(null);
   const [selectedTheatre, setSelectedTheatre] = useState(null);
   
+  // Parse query params to get preselected theatre or movie
+  const queryParams = new URLSearchParams(location.search);
+  const preselectedTheatreId = queryParams.get('theatreId');
+  const preselectedMovieId = queryParams.get('movieId');
+
   // Get data for dropdowns
   const { useGetMovies } = useMovies();
-  const { data: movies = [], isLoading: isLoadingMovies } = useGetMovies();
+  const { data: moviesData = [], isLoading: isLoadingMovies } = useGetMovies();
+  
+  // Ensure movies is always an array
+  const movies = Array.isArray(moviesData) ? moviesData : [];
+  
+  // Get theatres using the hook
+  const { data: theatresData = [], isLoading: isLoadingTheatres } = useGetTheatres();
+  
+  // Ensure theatres is always an array
+  const theatres = Array.isArray(theatresData) ? theatresData : [];
   
   const { useGetScreeningFormats, useCreateScreening } = useScreenings();
-  const { data: formats = [], isLoading: isLoadingFormats } = useGetScreeningFormats();
+  const { data: formatsData = [], isLoading: isLoadingFormats } = useGetScreeningFormats();
   
-  // Mock theatre data since we don't have a real theatres API hook
-  const theatres = [
-    { id: 1, name: 'Downtown Cinema', totalScreens: 8 },
-    { id: 2, name: 'Westside Theatre', totalScreens: 6 },
-    { id: 3, name: 'North Plaza Cinema', totalScreens: 5 }
-  ];
+  // Ensure formats is always an array
+  const formats = Array.isArray(formatsData) ? formatsData : [];
   
   // Form handling
   const {
@@ -39,8 +51,8 @@ const CreateScreeningPage = () => {
     formState: { errors }
   } = useForm({
     defaultValues: {
-      movieId: '',
-      theatreId: '',
+      movieId: preselectedMovieId || '',
+      theatreId: preselectedTheatreId || '',
       startDateString: '',
       startTimeString: '',
       screenNumber: '',
@@ -52,6 +64,16 @@ const CreateScreeningPage = () => {
   // Watch form fields
   const movieId = watch('movieId');
   const theatreId = watch('theatreId');
+  
+  // Set preselected values on load
+  useEffect(() => {
+    if (preselectedMovieId) {
+      setValue('movieId', preselectedMovieId);
+    }
+    if (preselectedTheatreId) {
+      setValue('theatreId', preselectedTheatreId);
+    }
+  }, [setValue, preselectedMovieId, preselectedTheatreId]);
   
   // Create screening mutation
   const { mutate: createScreening, isPending: isCreating } = useCreateScreening({
@@ -82,16 +104,30 @@ const CreateScreeningPage = () => {
     } else {
       setSelectedTheatre(null);
     }
-  }, [theatreId]);
+  }, [theatreId, theatres]);
   
   // Form submission handler
   const onSubmit = (data) => {
+    // Convert string values to appropriate types
+    const screeningData = {
+      ...data,
+      screenNumber: parseInt(data.screenNumber, 10),
+      basePrice: parseFloat(data.basePrice)
+    };
+    
     // Create screening
-    createScreening(data);
+    createScreening(screeningData);
+  };
+  
+  // Handle cancel
+  const handleCancel = () => {
+    if (window.confirm('Are you sure you want to cancel? Any unsaved changes will be lost.')) {
+      navigate('/admin/screenings');
+    }
   };
   
   // Loading state
-  if (isLoadingMovies || isLoadingFormats) {
+  if (isLoadingMovies || isLoadingFormats || isLoadingTheatres) {
     return <LoadingSpinner />;
   }
   
@@ -171,6 +207,7 @@ const CreateScreeningPage = () => {
               {selectedTheatre && (
                 <div className="mt-2 p-2 bg-gray-50 rounded-md text-sm">
                   <p><strong>Total Screens:</strong> {selectedTheatre.totalScreens}</p>
+                  <p><strong>Location:</strong> {selectedTheatre.address}</p>
                 </div>
               )}
             </div>
@@ -287,13 +324,14 @@ const CreateScreeningPage = () => {
             <Button
               type="button"
               variant="outline"
-              onClick={() => navigate('/admin/screenings')}
+              onClick={handleCancel}
             >
               Cancel
             </Button>
             <Button
               type="submit"
               variant="primary"
+              disabled={isCreating}
               loading={isCreating}
             >
               Create Screening

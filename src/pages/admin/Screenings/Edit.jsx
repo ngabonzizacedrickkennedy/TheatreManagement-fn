@@ -1,9 +1,10 @@
-// src/pages/admin/screenings/Edit.jsx
+// src/pages/admin/Screenings/Edit.jsx
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useScreenings } from '@hooks/useScreenings';
 import { useMovies } from '@hooks/useMovies';
+import { useGetTheatres } from '@hooks/useTheatres'; // Import theatres hook directly
 import { useToast } from '@contexts/ToastContext';
 import Button from '@components/common/Button';
 import Input from '@components/common/Input';
@@ -28,16 +29,21 @@ const EditScreeningPage = () => {
   
   // Get data for dropdowns
   const { useGetMovies } = useMovies();
-  const { data: movies = [], isLoading: isLoadingMovies } = useGetMovies();
+  const { data: moviesData = [], isLoading: isLoadingMovies } = useGetMovies();
   
-  const { data: formats = [], isLoading: isLoadingFormats } = useGetScreeningFormats();
+  // Ensure movies is always an array
+  const movies = Array.isArray(moviesData) ? moviesData : [];
   
-  // Mock theatre data since we don't have a real theatres API hook
-  const theatres = [
-    { id: 1, name: 'Downtown Cinema', totalScreens: 8 },
-    { id: 2, name: 'Westside Theatre', totalScreens: 6 },
-    { id: 3, name: 'North Plaza Cinema', totalScreens: 5 }
-  ];
+  // Get theatres data from API
+  const { data: theatresData = [], isLoading: isLoadingTheatres } = useGetTheatres();
+  
+  // Ensure theatres is always an array
+  const theatres = Array.isArray(theatresData) ? theatresData : [];
+  
+  const { data: formatsData = [], isLoading: isLoadingFormats } = useGetScreeningFormats();
+  
+  // Ensure formats is always an array
+  const formats = Array.isArray(formatsData) ? formatsData : [];
   
   // Form handling
   const {
@@ -100,19 +106,33 @@ const EditScreeningPage = () => {
     } else {
       setSelectedTheatre(null);
     }
-  }, [theatreId]);
+  }, [theatreId, theatres]);
   
   // Form submission handler
   const onSubmit = (data) => {
+    // Convert string values to appropriate types
+    const screeningData = {
+      ...data,
+      screenNumber: parseInt(data.screenNumber, 10),
+      basePrice: parseFloat(data.basePrice)
+    };
+    
     // Update screening
     updateScreening({
       id,
-      data
+      data: screeningData
     });
   };
   
+  // Handle cancel
+  const handleCancel = () => {
+    if (window.confirm('Are you sure you want to cancel? Any unsaved changes will be lost.')) {
+      navigate('/admin/screenings');
+    }
+  };
+  
   // Loading state
-  if (isLoadingScreening || isLoadingMovies || isLoadingFormats) {
+  if (isLoadingScreening || isLoadingMovies || isLoadingFormats || isLoadingTheatres) {
     return <LoadingSpinner />;
   }
   
@@ -197,6 +217,7 @@ const EditScreeningPage = () => {
               {selectedTheatre && (
                 <div className="mt-2 p-2 bg-gray-50 rounded-md text-sm">
                   <p><strong>Total Screens:</strong> {selectedTheatre.totalScreens}</p>
+                  <p><strong>Location:</strong> {selectedTheatre.address}</p>
                 </div>
               )}
             </div>
@@ -313,13 +334,14 @@ const EditScreeningPage = () => {
             <Button
               type="button"
               variant="outline"
-              onClick={() => navigate('/admin/screenings')}
+              onClick={handleCancel}
             >
               Cancel
             </Button>
             <Button
               type="submit"
               variant="primary"
+              disabled={isUpdating}
               loading={isUpdating}
             >
               Update Screening

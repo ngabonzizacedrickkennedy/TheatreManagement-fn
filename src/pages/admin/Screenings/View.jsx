@@ -1,8 +1,9 @@
-// src/pages/admin/screenings/View.jsx
+// src/pages/admin/Screenings/View.jsx
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useScreenings } from '@hooks/useScreenings';
 import { useBookings } from '@hooks/useBookings';
+import { useGetTheatres } from '@hooks/useTheatres'; // Import theatres hook directly
 import { useToast } from '@contexts/ToastContext';
 import { formatDate, formatEnumValue, formatCurrency } from '@utils/formatUtils';
 import Button from '@components/common/Button';
@@ -28,17 +29,26 @@ const ViewScreeningPage = () => {
   // Get screening details
   const { useGetScreening, useDeleteScreening } = useScreenings();
   const {
-    data: screeningData,
+    data: screening,
     isLoading: isLoadingScreening,
     error: screeningError
   } = useGetScreening(id);
   
+  // Get theatre details for the screening
+  const { data: theatresData = [], isLoading: isLoadingTheatres } = useGetTheatres();
+  const theatres = Array.isArray(theatresData) ? theatresData : [];
+  
   // Get booked seats for the screening
   const { useGetBookedSeats } = useBookings();
   const {
-    data: bookedSeats = [],
+    data: bookedSeatsData = [],
     isLoading: isLoadingSeats
   } = useGetBookedSeats(id);
+  
+  // Ensure bookedSeats is always an array
+  const bookedSeats = Array.isArray(bookedSeatsData) ? bookedSeatsData : 
+                      (bookedSeatsData && typeof bookedSeatsData === 'object' ? 
+                      Object.values(bookedSeatsData).filter(seat => typeof seat === 'string') : []);
   
   // Delete screening mutation
   const { mutate: deleteScreening, isPending: isPendingDelete } = useDeleteScreening({
@@ -57,25 +67,31 @@ const ViewScreeningPage = () => {
     setIsDeleting(true);
     
     // Show confirmation dialog
-    if (window.confirm('Are you sure you want to delete this screening? This cannot be undone.')) {
+    if (window.confirm('Are you sure you want to delete this screening? This cannot be undone and will cancel all existing bookings.')) {
       deleteScreening(id);
     } else {
       setIsDeleting(false);
     }
   };
   
+  // Find the theatre for this screening
+  const getTheatre = () => {
+    if (!screening || !theatres.length) return null;
+    return theatres.find(theatre => theatre.id === screening.theatreId) || null;
+  };
+  
+  // Get theatre details
+  const theatre = getTheatre();
+  
   // Loading state
-  if (isLoadingScreening || isLoadingSeats) {
+  if (isLoadingScreening || isLoadingSeats || isLoadingTheatres) {
     return <LoadingSpinner />;
   }
   
   // Error state
-  if (screeningError || !screeningData) {
+  if (screeningError || !screening) {
     return <NotFound message="Screening not found" />;
   }
-  
-  // Destructure screening data for easier access
-  const screening = screeningData;
   
   return (
     <div>
@@ -148,13 +164,15 @@ const ViewScreeningPage = () => {
                   <BuildingStorefrontIcon className="h-5 w-5 text-gray-400 mt-0.5 mr-3" />
                   <div>
                     <h4 className="text-sm font-medium text-gray-900">Theatre</h4>
-                    <p className="text-gray-600">{screening.theatreName}</p>
+                    <p className="text-gray-600">{screening.theatreName || 'Unknown Theatre'}</p>
                     <p className="text-sm text-gray-500">Screen {screening.screenNumber}</p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      <Link to={`/admin/theatres/${screening.theatreId}`} className="text-primary-600 hover:text-primary-500">
-                        View Theatre Details
-                      </Link>
-                    </p>
+                    {theatre && (
+                      <p className="text-sm text-gray-500 mt-1">
+                        <Link to={`/admin/theatres/${screening.theatreId}`} className="text-primary-600 hover:text-primary-500">
+                          View Theatre Details
+                        </Link>
+                      </p>
+                    )}
                   </div>
                 </div>
                 
@@ -245,6 +263,7 @@ const ViewScreeningPage = () => {
                     </Button>
                   </Link>
                   
+                  {/* Create similar screening link */}
                   <Link to={`/admin/screenings/create?movieId=${screening.movieId}&theatreId=${screening.theatreId}`}>
                     <Button 
                       variant="outline" 
@@ -256,6 +275,25 @@ const ViewScreeningPage = () => {
                     </Button>
                   </Link>
                 </div>
+                
+                {/* Theatre info */}
+                {theatre && (
+                  <div className="mt-6 pt-4 border-t border-gray-200">
+                    <h3 className="text-sm font-medium text-gray-900 mb-2">Theatre Information</h3>
+                    <div className="rounded-md bg-gray-50 p-3 text-sm">
+                      <p className="font-medium">{theatre.name}</p>
+                      <p className="text-gray-600 text-xs">{theatre.address}</p>
+                      {theatre.phoneNumber && (
+                        <p className="text-gray-600 text-xs mt-1">
+                          Phone: {theatre.phoneNumber}
+                        </p>
+                      )}
+                      <p className="text-gray-600 text-xs mt-1">
+                        Total Screens: {theatre.totalScreens}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
