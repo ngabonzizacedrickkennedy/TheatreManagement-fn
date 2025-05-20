@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useMovies } from '@hooks/useMovies';
 import { useToast } from '@contexts/ToastContext';
+import { formatEnumValue } from '@utils/formatUtils';
 import Button from '@components/common/Button';
 import Input from '@components/common/Input';
 import LoadingSpinner from '@components/common/LoadingSpinner';
@@ -15,18 +16,27 @@ const CreateMoviePage = () => {
   const [imagePreview, setImagePreview] = useState('');
   
   // Get genres for the dropdown
-  const { useCreateMovie } = useMovies();
-  const genres = [
-    { id: 1, name: "Action" },
-    { id: 2, name: "Comedy" },
-    { id: 3, name: "Drama" },
-    { id: 4, name: "Fantasy" },
-    { id: 5, name: "Horror" },
-    { id: 6, name: "Romance" },
-    { id: 7, name: "Sci-Fi" },
-    { id: 8, name: "Thriller" },
-    { id: 9, name: "Animation" },
-    { id: 10, name: "Documentary" },
+  const { useCreateMovie, useGetGenres } = useMovies();
+  const { data: genres = [], isLoading: isLoadingGenres } = useGetGenres();
+  
+  // Fallback genre list in case API call fails
+  const fallbackGenres = [
+    { value: "ACTION", name: "Action" },
+    { value: "COMEDY", name: "Comedy" },
+    { value: "DRAMA", name: "Drama" },
+    { value: "FANTASY", name: "Fantasy" },
+    { value: "HORROR", name: "Horror" },
+    { value: "ROMANCE", name: "Romance" },
+    { value: "SCI_FI", name: "Sci-Fi" },
+    { value: "THRILLER", name: "Thriller" },
+    { value: "ANIMATION", name: "Animation" },
+    { value: "DOCUMENTARY", name: "Documentary" },
+    { value: "ADVENTURE", name: "Adventure" },
+    { value: "CRIME", name: "Crime" },
+    { value: "MYSTERY", name: "Mystery" },
+    { value: "FAMILY", name: "Family" },
+    { value: "MUSICAL", name: "Musical" },
+    { value: "WESTERN", name: "Western" }
   ];
   
   
@@ -85,6 +95,11 @@ const CreateMoviePage = () => {
   
   // Movie ratings options
   const ratings = ['G', 'PG', 'PG-13', 'R', 'NC-17', 'NR'];
+  
+  // Loading state
+  if (isLoadingGenres) {
+    return <LoadingSpinner />;
+  }
   
   return (
     <div>
@@ -155,9 +170,9 @@ const CreateMoviePage = () => {
                   {...register('genre', { required: 'Genre is required' })}
                 >
                   <option value="">Select a genre</option>
-                  {genres.map(genre => (
-                    <option key={genre.id} value={genre.name}>
-                      {genre.name}
+                  {(genres.length > 0 ? genres : fallbackGenres).map(genre => (
+                    <option key={genre.value || genre} value={genre.value || genre}>
+                      {genre.name || formatEnumValue(genre)}
                     </option>
                   ))}
                 </select>
@@ -242,14 +257,6 @@ const CreateMoviePage = () => {
                 placeholder="https://example.com/poster.jpg"
                 error={errors.posterImageUrl?.message}
                 {...register('posterImageUrl', {
-                  // maxLength: {
-                  //   value: 255,
-                  //   message: 'URL cannot exceed 255 characters'
-                  // },
-                  // pattern: {
-                  //   value: /^(https?:\/\/)?[\w.-]+\.[a-z]{2,}(\/\S*)?$/i,
-                  //   message: 'Please enter a valid URL'
-                  // }
                   pattern: {
                     value: /^(https?:\/\/[\w.-]+(\.[a-z]{2,})?(\/\S*)?|data:image\/(jpeg|png|gif);base64,[a-zA-Z0-9+/]+={0,2})$/i,
                     message: 'Please enter a valid URL or Base64 image data'
@@ -281,10 +288,10 @@ const CreateMoviePage = () => {
                 placeholder="https://youtube.com/watch?v=xxxxx"
                 error={errors.trailerUrl?.message}
                 {...register('trailerUrl', {
-                  // maxLength: {
-                  //   value: 255,
-                  //   message: 'URL cannot exceed 255 characters'
-                  // },
+                  maxLength: {
+                    value: 255,
+                    message: 'URL cannot exceed 255 characters'
+                  },
                   pattern: {
                     value: /^(https?:\/\/)?[\w.-]+\.[a-z]{2,}(\/\S*)?$/i,
                     message: 'Please enter a valid URL'
