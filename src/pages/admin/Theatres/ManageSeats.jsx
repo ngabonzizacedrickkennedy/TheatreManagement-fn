@@ -79,7 +79,9 @@ const ManageSeatsPage = () => {
   // Process seats data when it's loaded
   useEffect(() => {
     if (seatsData) {
+      console.log("Raw seats data:", seatsData);
       const processedSeatMap = processSeatsData(seatsData);
+      console.log("Processed seat map:", processedSeatMap);
       setSeatMap(processedSeatMap);
     }
   }, [seatsData]);
@@ -91,11 +93,19 @@ const ManageSeatsPage = () => {
     // Group seats by row
     const rowMap = {};
     data.forEach(seat => {
-      const rowName = seat.row;
+      const rowName = seat.rowName; // Match property from DTO
       if (!rowMap[rowName]) {
         rowMap[rowName] = [];
       }
-      rowMap[rowName].push(seat);
+      
+      // Map to the format expected by the component
+      rowMap[rowName].push({
+        id: seat.id,
+        number: seat.seatNumber, // Match property from DTO
+        row: seat.rowName,
+        type: seat.seatType || 'STANDARD', // Fallback to standard if no type
+        priceMultiplier: seat.priceMultiplier || 1.0
+      });
     });
 
     // Convert to array format used by the component
@@ -434,7 +444,7 @@ const ManageSeatsPage = () => {
           <div className="flex justify-center items-center py-10">
             <LoadingSpinner size="lg" />
           </div>
-        ) : seatMap.length > 0 ? (
+        ) : seatMap && seatMap.length > 0 ? (
           <div className="overflow-x-auto mb-6">
             <div className="pb-6 text-center">
               <div className="inline-block w-full max-w-4xl mx-auto">
@@ -455,23 +465,24 @@ const ManageSeatsPage = () => {
                       {/* Seats */}
                       <div className="flex-grow flex justify-center">
                         <div className="flex space-x-2">
-                          {row.seats.map(seat => {
+                          {row.seats && row.seats.length > 0 ? row.seats.map(seat => {
+                            const seatType = seat.type || 'STANDARD';
                             const isSelected = selectedSeats.includes(seat.id);
-                            const { color } = SeatTypes[seat.type] || SeatTypes.STANDARD;
+                            const { color } = SeatTypes[seatType] || SeatTypes.STANDARD;
                             
                             return (
                               <button
                                 key={seat.id}
                                 className={`w-8 h-8 flex items-center justify-center rounded ${color} ${
                                   isSelected ? 'ring-2 ring-primary-500' : ''
-                                } ${seat.type === 'UNAVAILABLE' ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80 cursor-pointer'}`}
+                                } ${seatType === 'UNAVAILABLE' ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80 cursor-pointer'}`}
                                 onClick={() => handleSeatClick(seat.id)}
                                 disabled={isSubmitting}
                               >
                                 <span className="text-xs">{seat.number}</span>
                               </button>
                             );
-                          })}
+                          }) : <div className="text-sm text-gray-500">No seats in this row</div>}
                         </div>
                       </div>
                       
@@ -488,8 +499,15 @@ const ManageSeatsPage = () => {
         ) : (
           <div className="text-center py-8">
             <p className="text-gray-500">
-              No seats have been configured for this screen yet. Use the Initialize button above to create seats.
+              {seatsData && seatsData.length > 0 
+                ? "Error processing seat data. Please try refreshing the page."
+                : "No seats have been configured for this screen yet. Use the Initialize button above to create seats."}
             </p>
+            {seatsData && seatsData.length > 0 && (
+              <pre className="mt-4 text-left bg-gray-100 p-4 rounded max-h-40 overflow-auto text-xs">
+                {JSON.stringify(seatsData, null, 2)}
+              </pre>
+            )}
           </div>
         )}
         

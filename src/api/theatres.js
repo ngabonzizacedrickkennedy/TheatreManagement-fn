@@ -85,6 +85,7 @@ const theatreApi = {
    */
   getSeatingLayout: async (theatreId, screenNumber) => {
     const response = await apiClient.get(`/admin/theatres/${theatreId}/screens/${screenNumber}/layout`);
+    console.log(response.data);
     return response.data;
   },
 
@@ -95,9 +96,15 @@ const theatreApi = {
    * @returns {Promise<Array>} List of seats
    */
   getSeatsByTheatreAndScreen: async (theatreId, screenNumber) => {
-    const response = await apiClient.get(`/admin/seats/theatre/${theatreId}/screen/${screenNumber}`);
-    return response.data;
-  },
+    try {
+        const response = await apiClient.get(`/admin/seats/theatre/${theatreId}/screen/${screenNumber}`);
+        console.log(response.data);
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching seats:", error);
+        throw error;
+    }
+},
 
   /**
    * Get seat by ID
