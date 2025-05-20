@@ -1,6 +1,7 @@
 // src/pages/admin/Theatres/Edit.jsx
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useGetTheatre, useUpdateTheatre } from '@hooks/useTheatres';
 import { useForm } from 'react-hook-form';
 import { useToast } from '@contexts/ToastContext';
 import Button from '@components/common/Button';
@@ -14,9 +15,13 @@ const EditTheatrePage = () => {
   const navigate = useNavigate();
   const { showSuccess, showError } = useToast();
   const [imagePreview, setImagePreview] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
-  const [theatre, setTheatre] = useState(null);
-  const [error, setError] = useState(null);
+  
+  // Get theatre details
+  const {
+    data: theatre,
+    isLoading,
+    error
+  } = useGetTheatre(id);
   
   // Form handling
   const {
@@ -39,54 +44,31 @@ const EditTheatrePage = () => {
     }
   }, [imageUrl]);
   
-  // Mock API function to get theatre details
+  // Set form default values when theatre data is loaded
   useEffect(() => {
-    const fetchTheatre = async () => {
-      try {
-        setIsLoading(true);
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Mock data
-        const theatreData = {
-          id,
-          name: 'Downtown Cinema',
-          address: '123 Main Street, Anytown, ST 12345',
-          phoneNumber: '+1 555-123-4567',
-          email: 'downtown@theatrecinema.com',
-          description: 'Our flagship theatre located in the heart of downtown.',
-          totalScreens: 8,
-          imageUrl: 'https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c'
-        };
-        
-        setTheatre(theatreData);
-        
-        // Set form default values
-        Object.entries(theatreData).forEach(([key, value]) => {
-          setValue(key, value);
-        });
-        
-        // Set image preview
-        if (theatreData.imageUrl) {
-          setImagePreview(theatreData.imageUrl);
-        }
-        
-        setIsLoading(false);
-      } catch (err) {
-        setError(err.message || 'Failed to load theatre details');
-        setIsLoading(false);
+    if (theatre) {
+      // Set form default values
+      Object.entries(theatre).forEach(([key, value]) => {
+        setValue(key, value);
+      });
+      
+      // Set image preview
+      if (theatre.imageUrl) {
+        setImagePreview(theatre.imageUrl);
       }
-    };
-    
-    fetchTheatre();
-  }, [id, setValue]);
+    }
+  }, [theatre, setValue]);
   
-  // Mock API function to update a theatre
-  const updateTheatre = async (data) => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    return { id, ...data };
-  };
+  // Update theatre mutation
+  const { mutate: updateTheatre, isPending: isUpdating } = useUpdateTheatre({
+    onSuccess: () => {
+      showSuccess('Theatre updated successfully');
+      navigate(`/admin/theatres/${id}`);
+    },
+    onError: (error) => {
+      showError(error.message || 'Failed to update theatre');
+    }
+  });
   
   // Form submission handler
   const onSubmit = async (data) => {
@@ -95,10 +77,7 @@ const EditTheatrePage = () => {
       data.totalScreens = Number(data.totalScreens);
       
       // Update theatre
-      await updateTheatre(data);
-      
-      showSuccess('Theatre updated successfully');
-      navigate(`/admin/theatres/${id}`);
+      updateTheatre({ id, theatreData: data });
     } catch (error) {
       showError(error.message || 'Failed to update theatre');
     }
@@ -294,6 +273,7 @@ const EditTheatrePage = () => {
             <Button
               type="submit"
               variant="primary"
+              loading={isUpdating}
             >
               Update Theatre
             </Button>

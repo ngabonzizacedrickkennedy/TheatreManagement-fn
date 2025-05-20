@@ -1,9 +1,15 @@
 // src/pages/admin/Theatres/ManageSeats.jsx
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { 
+  useGetTheatre, 
+  useGetTheatreSeats, 
+  useUpdateTheatreSeats,
+  useInitializeSeats,
+  useDeleteScreenSeats
+} from '@hooks/useTheatres';
 import { useToast } from '@contexts/ToastContext';
 import Button from '@components/common/Button';
-import Input from '@components/common/Input';
 import LoadingSpinner from '@components/common/LoadingSpinner';
 import NotFound from '@components/common/NotFound';
 import {
@@ -13,6 +19,7 @@ import {
   CheckIcon
 } from '@heroicons/react/24/outline';
 
+// Seat types definition
 const SeatTypes = {
   STANDARD: { label: 'Standard', color: 'bg-blue-100 text-blue-800', priceMultiplier: 1.0 },
   PREMIUM: { label: 'Premium', color: 'bg-green-100 text-green-800', priceMultiplier: 1.5 },
@@ -25,10 +32,6 @@ const ManageSeatsPage = () => {
   const { id, screenNumber } = useParams();
   const navigate = useNavigate();
   const { showSuccess, showError } = useToast();
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [theatre, setTheatre] = useState(null);
-  const [error, setError] = useState(null);
   const [selectedScreen, setSelectedScreen] = useState(screenNumber ? parseInt(screenNumber) : 1);
   const [selectedSeatType, setSelectedSeatType] = useState('STANDARD');
   const [seatMap, setSeatMap] = useState([]);
@@ -38,98 +41,79 @@ const ManageSeatsPage = () => {
     rows: 8,
     seatsPerRow: 10
   });
-  
-  // Mock API function to get theatre details
+
+  // Get theatre details
+  const { 
+    data: theatre, 
+    isLoading: isLoadingTheatre, 
+    error: theatreError 
+  } = useGetTheatre(id);
+
+  // Get seats for the selected screen
+  const {
+    data: seatsData,
+    isLoading: isLoadingSeats,
+    refetch: refetchSeats
+  } = useGetTheatreSeats(id, selectedScreen, {
+    enabled: !!id && !!selectedScreen
+  });
+
+  // Update seats mutation
+  const {
+    mutate: updateSeats,
+    isPending: isUpdatingSeats
+  } = useUpdateTheatreSeats();
+
+  // Initialize seats mutation
+  const {
+    mutate: initializeSeats,
+    isPending: isInitializingSeats
+  } = useInitializeSeats();
+
+  // Delete screen seats mutation
+  const {
+    mutate: deleteScreenSeats,
+    isPending: isDeletingSeats
+  } = useDeleteScreenSeats();
+
+  // Process seats data when it's loaded
   useEffect(() => {
-    const fetchTheatre = async () => {
-      try {
-        setIsLoading(true);
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Mock data
-        const theatreData = {
-          id,
-          name: 'Downtown Cinema',
-          totalScreens: 8
-        };
-        
-        setTheatre(theatreData);
-        
-        // Fetch seats for selected screen
-        await fetchSeats(theatreData.id, selectedScreen);
-        
-      } catch (err) {
-        setError(err.message || 'Failed to load theatre details');
-        setIsLoading(false);
-      }
-    };
-    
-    fetchTheatre();
-  }, [id]);
-  
-  // Fetch seats for selected screen
-  const fetchSeats = async (theatreId, screen) => {
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Mock seat data - Generate a grid of seats for the screen
-      const rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
-      const seatsPerRow = 10;
-      
-      // Create an array of seat rows
-      const seatRows = rows.map(rowName => {
-        // Create array of seats for this row
-        const seats = Array.from({ length: seatsPerRow }, (_, index) => {
-          const seatNumber = index + 1;
-          const seatId = `${rowName}${seatNumber}`;
-          
-          // Add some variation to seat types for demonstration
-          let seatType = 'STANDARD';
-          if (rowName === 'A' || rowName === 'B') {
-            seatType = 'PREMIUM';
-          } else if (rowName === 'H' && (seatNumber === 1 || seatNumber === seatsPerRow)) {
-            seatType = 'WHEELCHAIR';
-          } else if (rowName === 'E' && seatNumber >= 3 && seatNumber <= 8) {
-            seatType = 'VIP';
-          }
-          
-          return {
-            id: `${theatreId}-${screen}-${seatId}`,
-            seatId,
-            row: rowName,
-            number: seatNumber,
-            type: seatType,
-            priceMultiplier: SeatTypes[seatType].priceMultiplier
-          };
-        });
-        
-        return {
-          rowName,
-          seats
-        };
-      });
-      
-      setSeatMap(seatRows);
-      setIsLoading(false);
-    } catch (err) {
-      setError(err.message || 'Failed to load seats');
-      setIsLoading(false);
+    if (seatsData) {
+      const processedSeatMap = processSeatsData(seatsData);
+      setSeatMap(processedSeatMap);
     }
+  }, [seatsData]);
+
+  // Function to process seats data from API into the format needed for the UI
+  const processSeatsData = (data) => {
+    if (!data || !Array.isArray(data)) return [];
+
+    // Group seats by row
+    const rowMap = {};
+    data.forEach(seat => {
+      const rowName = seat.row;
+      if (!rowMap[rowName]) {
+        rowMap[rowName] = [];
+      }
+      rowMap[rowName].push(seat);
+    });
+
+    // Convert to array format used by the component
+    return Object.entries(rowMap)
+      .sort(([a], [b]) => a.localeCompare(b)) // Sort rows alphabetically
+      .map(([rowName, seats]) => ({
+        rowName,
+        seats: seats.sort((a, b) => a.number - b.number) // Sort seats by number
+      }));
   };
-  
+
   // Handle screen change
-  const handleScreenChange = (screenNumber) => {
-    setSelectedScreen(screenNumber);
+  const handleScreenChange = (screenNum) => {
+    setSelectedScreen(screenNum);
     setSelectedSeats([]);
     setBulkEditMode(false);
-    
-    // Reset seat map and fetch seats for selected screen
-    setIsLoading(true);
-    fetchSeats(id, screenNumber);
   };
-  
+
   // Handle seat click
   const handleSeatClick = (seatId) => {
     if (bulkEditMode) {
@@ -144,49 +128,55 @@ const ManageSeatsPage = () => {
       updateSeatType([seatId], selectedSeatType);
     }
   };
-  
+
   // Update seat type for selected seats
-  const updateSeatType = async (seatIds, seatType) => {
-    setIsSubmitting(true);
-    
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Update seat map with new seat type
-      setSeatMap(prevMap => {
-        return prevMap.map(row => {
-          const updatedSeats = row.seats.map(seat => {
-            if (seatIds.includes(seat.id)) {
-              return {
-                ...seat,
-                type: seatType,
-                priceMultiplier: SeatTypes[seatType].priceMultiplier
-              };
-            }
-            return seat;
-          });
-          
-          return {
-            ...row,
-            seats: updatedSeats
-          };
-        });
-      });
-      
-      showSuccess('Seats updated successfully');
-      
-      // Clear selected seats if in bulk edit mode
-      if (bulkEditMode && seatIds.length > 1) {
-        setSelectedSeats([]);
+  const updateSeatType = (seatIds, seatType) => {
+    if (!seatIds || seatIds.length === 0) return;
+
+    updateSeats({
+      theatreId: id,
+      screenNumber: selectedScreen,
+      seatsData: {
+        seatIds,
+        seatType,
+        priceMultiplier: SeatTypes[seatType].priceMultiplier
       }
-    } catch (err) {
-      showError(err.message || 'Failed to update seats');
-    } finally {
-      setIsSubmitting(false);
-    }
+    }, {
+      onSuccess: () => {
+        // Update the seat map with the new seat types
+        setSeatMap(prevMap => {
+          return prevMap.map(row => {
+            const updatedSeats = row.seats.map(seat => {
+              if (seatIds.includes(seat.id)) {
+                return {
+                  ...seat,
+                  type: seatType,
+                  priceMultiplier: SeatTypes[seatType].priceMultiplier
+                };
+              }
+              return seat;
+            });
+            
+            return {
+              ...row,
+              seats: updatedSeats
+            };
+          });
+        });
+        
+        showSuccess('Seats updated successfully');
+        
+        // Clear selected seats if in bulk edit mode
+        if (bulkEditMode && seatIds.length > 1) {
+          setSelectedSeats([]);
+        }
+      },
+      onError: (error) => {
+        showError(error.message || 'Failed to update seats');
+      }
+    });
   };
-  
+
   // Apply bulk seat type update
   const applyBulkUpdate = () => {
     if (selectedSeats.length === 0) {
@@ -196,56 +186,52 @@ const ManageSeatsPage = () => {
     
     updateSeatType(selectedSeats, selectedSeatType);
   };
-  
+
   // Initialize screen seats
-  const initializeScreenSeats = async () => {
+  const handleInitializeSeats = () => {
     const { rows, seatsPerRow } = initializeValues;
     
     if (rows < 1 || rows > 26 || seatsPerRow < 1 || seatsPerRow > 30) {
       showError('Invalid configuration. Rows must be between 1-26 and seats per row between 1-30.');
       return;
     }
-    
-    setIsSubmitting(true);
-    
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Show success message
-      showSuccess(`Successfully initialized ${rows} rows with ${seatsPerRow} seats per row`);
-      
-      // Reload seats
-      fetchSeats(id, selectedScreen);
-    } catch (err) {
-      showError(err.message || 'Failed to initialize seats');
-      setIsSubmitting(false);
-    }
+
+    initializeSeats({
+      theatreId: id,
+      screenNumber: selectedScreen,
+      rows,
+      seatsPerRow
+    }, {
+      onSuccess: () => {
+        showSuccess(`Successfully initialized ${rows} rows with ${seatsPerRow} seats per row`);
+        refetchSeats();
+      },
+      onError: (error) => {
+        showError(error.message || 'Failed to initialize seats');
+      }
+    });
   };
-  
+
   // Delete screen seats
-  const deleteScreenSeats = async () => {
+  const handleDeleteScreenSeats = () => {
     if (!window.confirm(`Are you sure you want to delete all seats for Screen ${selectedScreen}?`)) {
       return;
     }
-    
-    setIsSubmitting(true);
-    
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Clear seat map
-      setSeatMap([]);
-      
-      showSuccess('All seats deleted successfully');
-      setIsSubmitting(false);
-    } catch (err) {
-      showError(err.message || 'Failed to delete seats');
-      setIsSubmitting(false);
-    }
+
+    deleteScreenSeats({
+      theatreId: id,
+      screenNumber: selectedScreen
+    }, {
+      onSuccess: () => {
+        setSeatMap([]);
+        showSuccess('All seats deleted successfully');
+      },
+      onError: (error) => {
+        showError(error.message || 'Failed to delete seats');
+      }
+    });
   };
-  
+
   // Handle input change for initialize values
   const handleInitializeChange = (e) => {
     const { name, value } = e.target;
@@ -254,17 +240,20 @@ const ManageSeatsPage = () => {
       [name]: parseInt(value) || 0
     }));
   };
-  
+
   // Loading state
-  if (isLoading) {
+  if (isLoadingTheatre) {
     return <LoadingSpinner />;
   }
-  
+
   // Error state
-  if (error || !theatre) {
+  if (theatreError || !theatre) {
     return <NotFound message="Theatre not found" />;
   }
-  
+
+  // Determine if any operation is in progress
+  const isSubmitting = isUpdatingSeats || isInitializingSeats || isDeletingSeats;
+
   return (
     <div>
       <div className="mb-6 flex items-center">
@@ -297,8 +286,9 @@ const ManageSeatsPage = () => {
               className="block w-full rounded-md border-gray-300 shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
               value={selectedScreen}
               onChange={(e) => handleScreenChange(parseInt(e.target.value))}
+              disabled={isSubmitting}
             >
-              {Array.from({ length: theatre.totalScreens }, (_, i) => i + 1).map(screen => (
+              {Array.from({ length: theatre.totalScreens || 0 }, (_, i) => i + 1).map(screen => (
                 <option key={screen} value={screen}>
                   Screen {screen}
                 </option>
@@ -319,6 +309,7 @@ const ManageSeatsPage = () => {
               className="block w-full rounded-md border-gray-300 shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
               value={selectedSeatType}
               onChange={(e) => setSelectedSeatType(e.target.value)}
+              disabled={isSubmitting}
             >
               {Object.entries(SeatTypes).map(([type, { label }]) => (
                 <option key={type} value={type}>
@@ -337,6 +328,7 @@ const ManageSeatsPage = () => {
                 setBulkEditMode(!bulkEditMode);
                 setSelectedSeats([]);
               }}
+              disabled={isSubmitting}
             >
               {bulkEditMode ? 'Exit Selection Mode' : 'Bulk Edit'}
             </Button>
@@ -351,7 +343,7 @@ const ManageSeatsPage = () => {
                 icon={<CheckIcon className="h-4 w-4 mr-1" />}
                 onClick={applyBulkUpdate}
                 disabled={selectedSeats.length === 0 || isSubmitting}
-                loading={isSubmitting}
+                loading={isUpdatingSeats}
               >
                 Apply to {selectedSeats.length} Seats
               </Button>
@@ -376,6 +368,7 @@ const ManageSeatsPage = () => {
                 onChange={handleInitializeChange}
                 min="1"
                 max="26"
+                disabled={isSubmitting}
               />
             </div>
             <div>
@@ -391,6 +384,7 @@ const ManageSeatsPage = () => {
                 onChange={handleInitializeChange}
                 min="1"
                 max="30"
+                disabled={isSubmitting}
               />
             </div>
             <div>
@@ -398,9 +392,9 @@ const ManageSeatsPage = () => {
                 variant="outline"
                 size="sm"
                 icon={<PlusIcon className="h-4 w-4 mr-1" />}
-                onClick={initializeScreenSeats}
+                onClick={handleInitializeSeats}
                 disabled={isSubmitting}
-                loading={isSubmitting}
+                loading={isInitializingSeats}
               >
                 Initialize
               </Button>
@@ -410,9 +404,9 @@ const ManageSeatsPage = () => {
                 variant="danger"
                 size="sm"
                 icon={<TrashIcon className="h-4 w-4 mr-1" />}
-                onClick={deleteScreenSeats}
+                onClick={handleDeleteScreenSeats}
                 disabled={isSubmitting || seatMap.length === 0}
-                loading={isSubmitting}
+                loading={isDeletingSeats}
               >
                 Delete All
               </Button>
@@ -435,8 +429,12 @@ const ManageSeatsPage = () => {
           </div>
         </div>
         
-        {/* Seat map */}
-        {seatMap.length > 0 ? (
+        {/* Seat map with loading state */}
+        {isLoadingSeats ? (
+          <div className="flex justify-center items-center py-10">
+            <LoadingSpinner size="lg" />
+          </div>
+        ) : seatMap.length > 0 ? (
           <div className="overflow-x-auto mb-6">
             <div className="pb-6 text-center">
               <div className="inline-block w-full max-w-4xl mx-auto">
@@ -459,7 +457,7 @@ const ManageSeatsPage = () => {
                         <div className="flex space-x-2">
                           {row.seats.map(seat => {
                             const isSelected = selectedSeats.includes(seat.id);
-                            const { color } = SeatTypes[seat.type];
+                            const { color } = SeatTypes[seat.type] || SeatTypes.STANDARD;
                             
                             return (
                               <button
@@ -500,6 +498,7 @@ const ManageSeatsPage = () => {
           <Button
             variant="outline"
             onClick={() => navigate(`/admin/theatres/${id}`)}
+            disabled={isSubmitting}
           >
             Done
           </Button>

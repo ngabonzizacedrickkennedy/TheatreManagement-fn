@@ -1,6 +1,7 @@
 // src/pages/admin/Theatres/List.jsx
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useGetTheatres, useDeleteTheatre } from '@hooks/useTheatres';
 import { useToast } from '@contexts/ToastContext';
 import Button from '@components/common/Button';
 import LoadingSpinner from '@components/common/LoadingSpinner';
@@ -17,40 +18,6 @@ import {
   ArrowsUpDownIcon
 } from '@heroicons/react/24/outline';
 
-// Mock theatre data since we don't have a real theatres API hook
-const MOCK_THEATRES = [
-  {
-    id: 1, 
-    name: 'Downtown Cinema',
-    address: '123 Main Street, Anytown, ST 12345',
-    phoneNumber: '+1 555-123-4567',
-    email: 'downtown@theatrecinema.com',
-    description: 'Our flagship theatre located in the heart of downtown.',
-    totalScreens: 8,
-    imageUrl: 'https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=800&q=80'
-  },
-  {
-    id: 2,
-    name: 'Westside Theatre',
-    address: '456 West Avenue, Anytown, ST 12345',
-    phoneNumber: '+1 555-987-6543',
-    email: 'westside@theatrecinema.com',
-    description: 'A modern theatre with IMAX screens and luxury seating.',
-    totalScreens: 6,
-    imageUrl: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=800&q=80'
-  },
-  {
-    id: 3,
-    name: 'North Plaza Cinema',
-    address: '789 North Boulevard, Anytown, ST 12345',
-    phoneNumber: '+1 555-789-0123',
-    email: 'northplaza@theatrecinema.com',
-    description: 'A family-friendly theatre with arcade and food court.',
-    totalScreens: 5,
-    imageUrl: 'https://images.unsplash.com/photo-1440404653325-ab127d49abc1?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=800&q=80'
-  }
-];
-
 const TheatreList = () => {
   const { showSuccess, showError } = useToast();
   
@@ -58,19 +25,32 @@ const TheatreList = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('name');
   const [sortOrder, setSortOrder] = useState('asc');
-  const [isLoading, setIsLoading] = useState(false);
-  const [theatres, setTheatres] = useState(MOCK_THEATRES);
   
-  // Mock delete function
+  // Get theatres data using the hook
+  const {
+    data: theatres = [],
+    isLoading,
+    refetch
+  } = useGetTheatres();
+  
+  // Delete theatre mutation
+  const {
+    mutate: deleteTheatre,
+    isPending: isDeleting
+  } = useDeleteTheatre({
+    onSuccess: () => {
+      showSuccess('Theatre deleted successfully');
+      refetch();
+    },
+    onError: (error) => {
+      showError(error.message || 'Failed to delete theatre');
+    }
+  });
+  
+  // Handle theatre deletion
   const handleDeleteTheatre = (id) => {
     if (window.confirm('Are you sure you want to delete this theatre?')) {
-      setIsLoading(true);
-      // Simulate API call
-      setTimeout(() => {
-        setTheatres(theatres.filter(theatre => theatre.id !== id));
-        setIsLoading(false);
-        showSuccess('Theatre deleted successfully');
-      }, 1000);
+      deleteTheatre(id);
     }
   };
   
@@ -97,7 +77,7 @@ const TheatreList = () => {
       // Search filter
       return searchQuery === '' || 
         theatre.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        theatre.address.toLowerCase().includes(searchQuery.toLowerCase());
+        (theatre.address && theatre.address.toLowerCase().includes(searchQuery.toLowerCase()));
     })
     .sort((a, b) => {
       // Sort by selected field
@@ -108,10 +88,10 @@ const TheatreList = () => {
           comparison = a.name.localeCompare(b.name);
           break;
         case 'address':
-          comparison = a.address.localeCompare(b.address);
+          comparison = (a.address || '').localeCompare(b.address || '');
           break;
         case 'totalScreens':
-          comparison = a.totalScreens - b.totalScreens;
+          comparison = (a.totalScreens || 0) - (b.totalScreens || 0);
           break;
         default:
           comparison = a.name.localeCompare(b.name);
@@ -187,7 +167,7 @@ const TheatreList = () => {
                     alt={theatre.name} 
                     onError={(e) => {
                       e.target.onerror = null;
-                      e.target.src = '/path/to/placeholder-image.jpg';
+                      e.target.src = 'https://via.placeholder.com/400x200?text=No+Image';
                     }}
                   />
                 ) : (
@@ -203,28 +183,28 @@ const TheatreList = () => {
                 <div className="space-y-2 mb-4">
                   <div className="flex items-start">
                     <MapPinIcon className="h-5 w-5 text-gray-400 mt-0.5 mr-2 flex-shrink-0" />
-                    <span className="text-sm text-gray-600">{theatre.address}</span>
+                    <span className="text-sm text-gray-600">{theatre.address || 'No address provided'}</span>
                   </div>
                   
                   <div className="flex items-center">
                     <PhoneIcon className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0" />
-                    <span className="text-sm text-gray-600">{theatre.phoneNumber}</span>
+                    <span className="text-sm text-gray-600">{theatre.phoneNumber || 'No phone number'}</span>
                   </div>
                   
                   <div className="flex items-center">
                     <EnvelopeIcon className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0" />
-                    <span className="text-sm text-gray-600">{theatre.email}</span>
+                    <span className="text-sm text-gray-600">{theatre.email || 'No email'}</span>
                   </div>
                 </div>
                 
                 <div className="mb-4">
                   <div className="flex items-center">
                     <span className="text-sm font-medium text-gray-900 mr-2">Total Screens:</span>
-                    <span className="text-sm text-gray-600">{theatre.totalScreens}</span>
+                    <span className="text-sm text-gray-600">{theatre.totalScreens || 0}</span>
                   </div>
                   
                   <p className="mt-2 text-sm text-gray-600 line-clamp-2">
-                    {theatre.description}
+                    {theatre.description || 'No description available'}
                   </p>
                 </div>
                 
@@ -261,6 +241,7 @@ const TheatreList = () => {
                     className="flex-1"
                     icon={<TrashIcon className="h-4 w-4 mr-1" />}
                     onClick={() => handleDeleteTheatre(theatre.id)}
+                    disabled={isDeleting}
                   >
                     Delete
                   </Button>
