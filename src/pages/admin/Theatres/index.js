@@ -5,5 +5,12 @@ import EditTheatre from './Edit';
 import ViewTheatre from './View';
 import ManageSeats from './ManageSeats';
 
-export { TheatreList, CreateTheatre, EditTheatre, ViewTheatre, ManageSeats };
+export { 
+  TheatreList, 
+  CreateTheatre, 
+  EditTheatre, 
+  ViewTheatre,
+  ManageSeats 
+};
+
 export default TheatreList;

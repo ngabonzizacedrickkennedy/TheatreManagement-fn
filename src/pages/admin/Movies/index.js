@@ -4,5 +4,11 @@ import CreateMovie from './Create';
 import EditMovie from './Edit';
 import ViewMovie from './View';
 
-export { MovieList, CreateMovie, EditMovie, ViewMovie };
+export { 
+  MovieList, 
+  CreateMovie, 
+  EditMovie, 
+  ViewMovie 
+};
+
 export default MovieList;

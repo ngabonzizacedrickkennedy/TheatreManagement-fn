@@ -26,11 +26,40 @@ import CheckoutPage from '@pages/user/Checkout';
 
 // Admin Pages
 import AdminDashboardPage from '@pages/admin/Dashboard';
-import AdminMoviesPage from '@pages/admin/Movies';
-import AdminTheatresPage from '@pages/admin/Theatres';
-import AdminScreeningsPage from '@pages/admin/Screenings';
+
+// Admin Movies Pages
+import { 
+  MovieList as AdminMoviesPage,
+  CreateMovie as AdminMoviesCreatePage,
+  EditMovie as AdminMoviesEditPage,
+  ViewMovie as AdminMoviesViewPage
+} from '@pages/admin/Movies/index';
+
+// Admin Theatres Pages
+import { 
+  TheatreList as AdminTheatresPage,
+  CreateTheatre as AdminTheatresCreatePage,
+  EditTheatre as AdminTheatresEditPage,
+  ViewTheatre as AdminTheatresViewPage,
+  ManageSeats as AdminTheatresManageSeatsPage
+} from '@pages/admin/Theatres/index';
+
+// Admin Screenings Pages
+import AdminScreeningsPage from '@pages/admin/Screenings/Screenings';
+import AdminScreeningsCreatePage from '@pages/admin/Screenings/Create';
+import AdminScreeningsEditPage from '@pages/admin/Screenings/Edit';
+import AdminScreeningsViewPage from '@pages/admin/Screenings/View';
+
+// Admin Bookings Pages
 import AdminBookingsPage from '@pages/admin/Bookings';
-import AdminUsersPage from '@pages/admin/Users';
+
+// Admin Users Pages
+import { 
+  UserList as AdminUsersPage,
+  CreateUser as AdminUsersCreatePage,
+  EditUser as AdminUsersEditPage,
+  ViewUser as AdminUsersViewPage
+} from '@pages/admin/Users/index';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -112,15 +141,60 @@ const router = createBrowserRouter([
     errorElement: <NotFoundPage />,
     children: [
       { index: true, element: <AdminDashboardPage /> },
+      
+      // Movie management routes
       { path: 'movies', element: <AdminMoviesPage /> },
+      { path: 'movies/create', element: <AdminMoviesCreatePage /> },
+      { path: 'movies/:id', element: <AdminMoviesViewPage /> },
+      { path: 'movies/:id/edit', element: <AdminMoviesEditPage /> },
+      
+      // Theatre management routes
       { path: 'theatres', element: <AdminTheatresPage /> },
+      { path: 'theatres/create', element: <AdminTheatresCreatePage /> },
+      { path: 'theatres/:id', element: <AdminTheatresViewPage /> },
+      { path: 'theatres/:id/edit', element: <AdminTheatresEditPage /> },
+      { path: 'theatres/:id/seats', element: <AdminTheatresManageSeatsPage /> },
+      { path: 'theatres/:id/screens/:screenNumber/seats', element: <AdminTheatresManageSeatsPage /> },
+      
+      // Screening management routes
       { path: 'screenings', element: <AdminScreeningsPage /> },
+      { path: 'screenings/create', element: <AdminScreeningsCreatePage /> },
+      { path: 'screenings/:id', element: <AdminScreeningsViewPage /> },
+      { path: 'screenings/:id/edit', element: <AdminScreeningsEditPage /> },
+      
+      // Booking management routes
       { path: 'bookings', element: <AdminBookingsPage /> },
+      
+      // User management routes
       { 
         path: 'users', 
         element: (
           <RoleBasedRoute roles={['ROLE_ADMIN']}>
             <AdminUsersPage />
+          </RoleBasedRoute>
+        )
+      },
+      { 
+        path: 'users/create', 
+        element: (
+          <RoleBasedRoute roles={['ROLE_ADMIN']}>
+            <AdminUsersCreatePage />
+          </RoleBasedRoute>
+        )
+      },
+      { 
+        path: 'users/:id', 
+        element: (
+          <RoleBasedRoute roles={['ROLE_ADMIN']}>
+            <AdminUsersViewPage />
+          </RoleBasedRoute>
+        )
+      },
+      { 
+        path: 'users/:id/edit', 
+        element: (
+          <RoleBasedRoute roles={['ROLE_ADMIN']}>
+            <AdminUsersEditPage />
           </RoleBasedRoute>
         )
       }

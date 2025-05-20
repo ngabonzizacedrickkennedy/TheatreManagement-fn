@@ -3,7 +3,7 @@ import { Link, NavLink, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
 import useResponsive from '@hooks/useResponsive';
 
-// Icons (you can replace these with your preferred icon library)
+// Icons
 import { 
   ChartBarIcon,
   FilmIcon, 
@@ -17,7 +17,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 const AdminLayout = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, isAdmin } = useAuth();
   const location = useLocation();
   const { isMobile } = useResponsive();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -34,15 +34,19 @@ const AdminLayout = () => {
     logout();
   };
   
-  // Navigation items
-  const navigationItems = [
+  // Navigation items (base items for all admin users)
+  const baseNavigationItems = [
     { name: 'Dashboard', to: '/admin', icon: <ChartBarIcon className="w-5 h-5" />, exact: true },
     { name: 'Movies', to: '/admin/movies', icon: <FilmIcon className="w-5 h-5" /> },
     { name: 'Theatres', to: '/admin/theatres', icon: <BuildingStorefrontIcon className="w-5 h-5" /> },
     { name: 'Screenings', to: '/admin/screenings', icon: <CalendarIcon className="w-5 h-5" /> },
     { name: 'Bookings', to: '/admin/bookings', icon: <TicketIcon className="w-5 h-5" /> },
-    { name: 'Users', to: '/admin/users', icon: <UsersIcon className="w-5 h-5" /> },
   ];
+
+  // Add Users menu item only for admin users
+  const navigationItems = isAdmin 
+    ? [...baseNavigationItems, { name: 'Users', to: '/admin/users', icon: <UsersIcon className="w-5 h-5" /> }]
+    : baseNavigationItems;
   
   // Sidebar content
   const sidebarContent = (

@@ -1,7 +1,7 @@
 // src/pages/admin/Movies/Create.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { useMovies } from '@hooks/useMovies';
 import { useToast } from '@contexts/ToastContext';
 import Button from '@components/common/Button';
@@ -18,6 +18,7 @@ const CreateMoviePage = () => {
   const { useGetGenres, useCreateMovie } = useMovies();
   const { data: genres = [], isLoading: isLoadingGenres } = useGetGenres();
   
+  
   // Create movie mutation
   const { mutate: createMovie, isPending: isCreating } = useCreateMovie({
     onSuccess: (data) => {
@@ -33,7 +34,6 @@ const CreateMoviePage = () => {
   const {
     register,
     handleSubmit,
-    control,
     watch,
     formState: { errors }
   } = useForm({
@@ -74,9 +74,8 @@ const CreateMoviePage = () => {
   
   // Movie ratings options
   const ratings = ['G', 'PG', 'PG-13', 'R', 'NC-17', 'NR'];
-  
-  // Loading state
-  if (isLoadingGenres) {
+   // Loading state
+   if (isLoadingGenres) {
     return <LoadingSpinner />;
   }
   
@@ -150,8 +149,8 @@ const CreateMoviePage = () => {
                 >
                   <option value="">Select a genre</option>
                   {genres.map(genre => (
-                    <option key={genre} value={genre}>
-                      {genre.replace('_', ' ')}
+                    <option key={genre.id} value={genre.name}>
+                      {genre.name}
                     </option>
                   ))}
                 </select>
@@ -236,13 +235,17 @@ const CreateMoviePage = () => {
                 placeholder="https://example.com/poster.jpg"
                 error={errors.posterImageUrl?.message}
                 {...register('posterImageUrl', {
-                  maxLength: {
-                    value: 255,
-                    message: 'URL cannot exceed 255 characters'
-                  },
+                  // maxLength: {
+                  //   value: 255,
+                  //   message: 'URL cannot exceed 255 characters'
+                  // },
+                  // pattern: {
+                  //   value: /^(https?:\/\/)?[\w.-]+\.[a-z]{2,}(\/\S*)?$/i,
+                  //   message: 'Please enter a valid URL'
+                  // }
                   pattern: {
-                    value: /^(https?:\/\/)?[\w.-]+\.[a-z]{2,}(\/\S*)?$/i,
-                    message: 'Please enter a valid URL'
+                    value: /^(https?:\/\/[\w.-]+(\.[a-z]{2,})?(\/\S*)?|data:image\/(jpeg|png|gif);base64,[a-zA-Z0-9+/]+={0,2})$/i,
+                    message: 'Please enter a valid URL or Base64 image data'
                   }
                 })}
               />
@@ -271,10 +274,10 @@ const CreateMoviePage = () => {
                 placeholder="https://youtube.com/watch?v=xxxxx"
                 error={errors.trailerUrl?.message}
                 {...register('trailerUrl', {
-                  maxLength: {
-                    value: 255,
-                    message: 'URL cannot exceed 255 characters'
-                  },
+                  // maxLength: {
+                  //   value: 255,
+                  //   message: 'URL cannot exceed 255 characters'
+                  // },
                   pattern: {
                     value: /^(https?:\/\/)?[\w.-]+\.[a-z]{2,}(\/\S*)?$/i,
                     message: 'Please enter a valid URL'
