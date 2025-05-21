@@ -1,6 +1,7 @@
-// src/hooks/useBookings.js - Improved version with better error handling
+// src/hooks/useBookings.js
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useToast } from '@contexts/ToastContext';
+import bookingApi from '@api/bookings';
 
 /**
  * Custom hook for managing bookings
@@ -18,23 +19,8 @@ export const useBookings = () => {
       queryKey: ['user-bookings'],
       queryFn: async () => {
         try {
-          const response = await fetch('/api/bookings');
-          
-          if (!response.ok) {
-            throw new Error(`Error fetching bookings: ${response.statusText}`);
-          }
-          
-          const data = await response.json();
-          
-          // Handle different response formats
-          if (data.success === false) {
-            throw new Error(data.message || 'Failed to fetch bookings');
-          }
-          
-          // Extract data from the response
-          const bookings = data.data || data || [];
-          
-          return Array.isArray(bookings) ? bookings : [];
+          const data = await bookingApi.getUserBookings();
+          return Array.isArray(data) ? data : [];
         } catch (error) {
           console.error('Error fetching user bookings:', error);
           throw error;
@@ -52,21 +38,7 @@ export const useBookings = () => {
       queryKey: ['booking', id],
       queryFn: async () => {
         try {
-          const response = await fetch(`/api/bookings/${id}`);
-          
-          if (!response.ok) {
-            throw new Error(`Error fetching booking: ${response.statusText}`);
-          }
-          
-          const data = await response.json();
-          
-          // Handle different response formats
-          if (data.success === false) {
-            throw new Error(data.message || 'Failed to fetch booking');
-          }
-          
-          // Extract data from the response
-          return data.data || data;
+          return await bookingApi.getBookingById(id);
         } catch (error) {
           console.error(`Error fetching booking ${id}:`, error);
           throw error;
@@ -85,33 +57,7 @@ export const useBookings = () => {
       queryKey: ['booked-seats', screeningId],
       queryFn: async () => {
         try {
-          const response = await fetch(`/api/screenings/${screeningId}/booked-seats`);
-          
-          if (!response.ok) {
-            throw new Error(`Error fetching booked seats: ${response.statusText}`);
-          }
-          
-          const data = await response.json();
-          
-          // Handle different response formats
-          if (data.success === false) {
-            throw new Error(data.message || 'Failed to fetch booked seats');
-          }
-          
-          // Extract data from the response - handle different formats
-          let bookedSeats = [];
-          
-          if (data.data) {
-            bookedSeats = data.data;
-          } else if (Array.isArray(data)) {
-            bookedSeats = data;
-          } else if (data.seats) {
-            bookedSeats = data.seats;
-          } else if (data.bookedSeats) {
-            bookedSeats = data.bookedSeats;
-          }
-          
-          return Array.isArray(bookedSeats) ? bookedSeats : [];
+          return await bookingApi.getBookedSeatsByScreeningId(screeningId);
         } catch (error) {
           console.error(`Error fetching booked seats for screening ${screeningId}:`, error);
           throw error;
@@ -130,63 +76,7 @@ export const useBookings = () => {
       queryKey: ['seating-layout', screeningId],
       queryFn: async () => {
         try {
-          const response = await fetch(`/api/screenings/${screeningId}/layout`);
-          
-          if (!response.ok) {
-            throw new Error(`Error fetching seating layout: ${response.statusText}`);
-          }
-          
-          const data = await response.json();
-          
-          // Handle different response formats
-          if (data.success === false) {
-            throw new Error(data.message || 'Failed to fetch seating layout');
-          }
-          
-          // Extract data from the response
-          const layoutData = data.data || data;
-          
-          // Normalize the layout data
-          if (layoutData && typeof layoutData === 'object') {
-            // Check if it has the expected 'rows' property
-            if (Array.isArray(layoutData.rows)) {
-              // Standard format - just return it
-              return layoutData;
-            }
-            
-            // Try to parse alternative formats
-            const rowKeys = Object.keys(layoutData).filter(key => 
-              key.match(/^[A-Z]$/) // Simple check for row names (A, B, C, etc.)
-            );
-            
-            if (rowKeys.length > 0) {
-              // Extract rows from object keys
-              const rows = rowKeys.map(name => {
-                const rowData = layoutData[name];
-                return {
-                  name,
-                  seatsCount: rowData.seatsCount || 10,
-                  priceMultiplier: rowData.priceMultiplier || 1.0,
-                  seatType: rowData.seatType || 'STANDARD'
-                };
-              });
-              
-              return {
-                rows,
-                basePrice: layoutData.basePrice || 10.99
-              };
-            }
-          }
-          
-          // Fallback to default layout if the format is unexpected
-          return {
-            rows: [
-              { name: "A", seatsCount: 8, priceMultiplier: 1.0, seatType: "STANDARD" },
-              { name: "B", seatsCount: 8, priceMultiplier: 1.0, seatType: "STANDARD" },
-              { name: "C", seatsCount: 8, priceMultiplier: 1.2, seatType: "PREMIUM" }
-            ],
-            basePrice: layoutData?.basePrice || 10.99
-          };
+          return await bookingApi.getSeatingLayout(screeningId);
         } catch (error) {
           console.error(`Error fetching seating layout for screening ${screeningId}:`, error);
           throw error;
@@ -231,44 +121,7 @@ export const useBookings = () => {
           }
           
           // Fall back to API call if we can't calculate ourselves
-          const response = await fetch('/api/bookings/calculate', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              screeningId,
-              selectedSeats
-            }),
-          });
-          
-          if (!response.ok) {
-            throw new Error(`Error calculating price: ${response.statusText}`);
-          }
-          
-          const data = await response.json();
-          
-          // Handle different response formats
-          if (data.success === false) {
-            throw new Error(data.message || 'Failed to calculate price');
-          }
-          
-          // Extract data from the response
-          const priceData = data.data || data;
-          
-          // Provide a fallback if API returns unexpected format
-          if (!priceData.totalPrice) {
-            // Simple fallback for total price (10.99 per seat)
-            const totalPrice = selectedSeats.length * 10.99;
-            
-            return {
-              basePrice: 10.99,
-              totalPrice,
-              seats: selectedSeats
-            };
-          }
-          
-          return priceData;
+          return await bookingApi.calculatePrice(screeningId, selectedSeats);
         } catch (error) {
           console.error(`Error calculating price for screening ${screeningId}:`, error);
           
@@ -307,35 +160,12 @@ export const useBookings = () => {
             throw new Error('Payment method is required');
           }
           
-          // Normalize the booking data - check what property name the API expects
-          const normalizedData = {
-            screeningId: data.screeningId,
-            bookedSeats: data.selectedSeats, // The API might expect 'bookedSeats' instead of 'selectedSeats'
-            paymentMethod: data.paymentMethod
-          };
-          
-          const response = await fetch('/api/bookings', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(normalizedData),
-          });
-          
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.message || `Error creating booking: ${response.statusText}`);
-          }
-          
-          const responseData = await response.json();
-          
-          // Handle different response formats
-          if (responseData.success === false) {
-            throw new Error(responseData.message || 'Failed to create booking');
-          }
-          
-          // Extract data from the response
-          return responseData.data || responseData;
+          // Use the bookingApi which handles token validation internally
+          return await bookingApi.createBooking(
+            data.screeningId, 
+            data.selectedSeats, 
+            data.paymentMethod
+          );
         } catch (error) {
           console.error('Error creating booking:', error);
           throw error;
@@ -359,23 +189,7 @@ export const useBookings = () => {
     return useMutation({
       mutationFn: async (id) => {
         try {
-          const response = await fetch(`/api/bookings/${id}`, {
-            method: 'DELETE',
-          });
-          
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.message || `Error cancelling booking: ${response.statusText}`);
-          }
-          
-          const data = await response.json();
-          
-          // Handle different response formats
-          if (data.success === false) {
-            throw new Error(data.message || 'Failed to cancel booking');
-          }
-          
-          return data.data || data;
+          return await bookingApi.cancelBooking(id);
         } catch (error) {
           console.error(`Error cancelling booking ${id}:`, error);
           throw error;

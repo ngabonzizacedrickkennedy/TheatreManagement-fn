@@ -1,541 +1,361 @@
 // src/pages/admin/Dashboard.jsx
-import { useState, useEffect } from 'react';
+
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useMovies } from '@hooks/useMovies';
+import { useAuth } from '@contexts/AuthContext';
 import { useBookings } from '@hooks/useBookings';
-import { useScreenings } from '@hooks/useScreenings';
-import { formatCurrency, formatDate } from '@utils/formatUtils';
+import { useMovies } from '@hooks/useMovies';
+import { useGetTheatres } from '@hooks/useTheatres';
+import { formatDate, formatCurrency } from '@utils/formatUtils';
 import LoadingSpinner from '@components/common/LoadingSpinner';
-import Button from '@components/common/Button';
-import { 
-  FilmIcon, 
-  TicketIcon, 
-  UserIcon, 
+import {
+  UserIcon,
+  FilmIcon,
   BuildingStorefrontIcon,
-  ArrowUpIcon,
-  ArrowDownIcon,
-  CurrencyDollarIcon,
-  CalculatorIcon,
-  CalendarIcon
+  TicketIcon,
+  ChartBarIcon,
+  ArrowTrendingUpIcon,
+  ArrowTrendingDownIcon,
+  ClockIcon
 } from '@heroicons/react/24/outline';
-import { 
-  PieChart, 
-  Pie, 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  Cell
-} from 'recharts';
 
 const AdminDashboardPage = () => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalMovies: 0,
-    totalBookings: 0,
+  const { user } = useAuth();
+  const [totalStats, setTotalStats] = useState({
     totalUsers: 0,
+    totalMovies: 0,
     totalTheatres: 0,
-    totalRevenue: 0,
-    recentBookings: [],
-    popularMovies: [],
-    upcomingScreenings: [],
-    bookingStatusData: [],
-    revenueData: [],
-    bookingsByMovieData: []
+    totalBookings: 0
   });
+  const [bookingStats, setBookingStats] = useState({
+    completed: 0,
+    pending: 0,
+    cancelled: 0
+  });
+  const [isLoading, setIsLoading] = useState(true);
   
-  // Hooks for fetching data
-  const { useGetMovies } = useMovies();
-  const { useGetAllBookings } = useBookings();
-  const { useGetUpcomingScreenings } = useScreenings();
+  // Use hooks for data fetching
+  // Get all bookings - Using the correct hook
+  const { useGetUserBookings } = useBookings();
+  const { 
+    data: bookingsData = [], 
+    isLoading: isLoadingBookings 
+  } = useGetUserBookings();
   
   // Get movies
+  const { useGetMovies } = useMovies();
   const { 
-    data: movies = [], 
+    data: moviesData = [], 
     isLoading: isLoadingMovies 
   } = useGetMovies();
   
-  // Get bookings
+  // Get theatres
   const { 
-    data: bookings = [], 
-    isLoading: isLoadingBookings 
-  } = useGetAllBookings();
+    data: theatresData = [], 
+    isLoading: isLoadingTheatres 
+  } = useGetTheatres();
   
-  // Get upcoming screenings
-  const { 
-    data: screenings = [], 
-    isLoading: isLoadingScreenings 
-  } = useGetUpcomingScreenings();
-  
-  // Mock function to get users (for the admin dashboard)
-  const fetchUsers = async () => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return [
-      { id: 1, username: 'johndoe', email: 'john@example.com' },
-      { id: 2, username: 'janedoe', email: 'jane@example.com' },
-      { id: 3, username: 'bobsmith', email: 'bob@example.com' },
-      { id: 4, username: 'alicejones', email: 'alice@example.com' },
-      { id: 5, username: 'michaelb', email: 'michael@example.com' }
-    ];
-  };
-  
-  // Mock function to get theatres
-  const fetchTheatres = async () => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return [
-      { id: 1, name: 'Downtown Cinema', location: 'City Center' },
-      { id: 2, name: 'Westside Theatre', location: 'West District' },
-      { id: 3, name: 'North Plaza Cinema', location: 'North Plaza' }
-    ];
-  };
-  
-  // Prepare dashboard data
+  // Process data when it's loaded
   useEffect(() => {
-    const loadDashboardData = async () => {
-      try {
-        if (isLoadingMovies || isLoadingBookings || isLoadingScreenings) {
-          return;
-        }
+    if (!isLoadingBookings && !isLoadingMovies && !isLoadingTheatres) {
+      // Calculate total stats
+      setTotalStats({
+        totalUsers: 0, // This would normally come from a users API call
+        totalMovies: Array.isArray(moviesData) ? moviesData.length : 0,
+        totalTheatres: Array.isArray(theatresData) ? theatresData.length : 0,
+        totalBookings: Array.isArray(bookingsData) ? bookingsData.length : 0
+      });
+      
+      // Calculate booking stats
+      if (Array.isArray(bookingsData)) {
+        const completed = bookingsData.filter(b => b.paymentStatus === 'COMPLETED').length;
+        const pending = bookingsData.filter(b => b.paymentStatus === 'PENDING').length;
+        const cancelled = bookingsData.filter(b => b.paymentStatus === 'CANCELLED').length;
         
-        // Get users and theatres
-        const users = await fetchUsers();
-        const theatres = await fetchTheatres();
-        
-        // Calculate total revenue
-        const totalRevenue = bookings.reduce((sum, booking) => sum + booking.totalAmount, 0);
-        
-        // Get recent bookings
-        const recentBookings = [...bookings]
-          .sort((a, b) => new Date(b.bookingTime) - new Date(a.bookingTime))
-          .slice(0, 5);
-        
-        // Get booking status data for pie chart
-        const statusCounts = {
-          COMPLETED: 0,
-          PENDING: 0,
-          CANCELLED: 0,
-          REFUNDED: 0
-        };
-        
-        bookings.forEach(booking => {
-          if (statusCounts[booking.paymentStatus] !== undefined) {
-            statusCounts[booking.paymentStatus]++;
-          }
+        setBookingStats({
+          completed,
+          pending,
+          cancelled
         });
-        
-        const bookingStatusData = Object.entries(statusCounts).map(([name, value]) => ({
-          name, value
-        }));
-        
-        // Generate revenue data for the last 7 days
-        const revenueData = [];
-        const currentDate = new Date();
-        
-        for (let i = 6; i >= 0; i--) {
-          const date = new Date(currentDate);
-          date.setDate(date.getDate() - i);
-          
-          const dayBookings = bookings.filter(booking => {
-            const bookingDate = new Date(booking.bookingTime);
-            return bookingDate.toDateString() === date.toDateString();
-          });
-          
-          const dayRevenue = dayBookings.reduce((sum, booking) => sum + booking.totalAmount, 0);
-          
-          revenueData.push({
-            date: date.toLocaleDateString('en-US', { weekday: 'short' }),
-            revenue: dayRevenue
-          });
-        }
-        
-        // Calculate bookings by movie
-        const bookingsByMovie = {};
-        
-        bookings.forEach(booking => {
-          if (!bookingsByMovie[booking.movieTitle]) {
-            bookingsByMovie[booking.movieTitle] = 0;
-          }
-          bookingsByMovie[booking.movieTitle]++;
-        });
-        
-        const bookingsByMovieData = Object.entries(bookingsByMovie)
-          .map(([name, value]) => ({ name, value }))
-          .sort((a, b) => b.value - a.value)
-          .slice(0, 5);
-        
-        // Get popular movies
-        const popularMovies = [...movies]
-          .sort((a, b) => {
-            const aBookings = bookingsByMovie[a.title] || 0;
-            const bBookings = bookingsByMovie[b.title] || 0;
-            return bBookings - aBookings;
-          })
-          .slice(0, 5);
-        
-        // Get upcoming screenings
-        const upcomingScreenings = Object.values(screenings)
-          .flat()
-          .sort((a, b) => new Date(a.startTime) - new Date(b.startTime))
-          .slice(0, 5);
-        
-        // Set stats
-        setStats({
-          totalMovies: movies.length,
-          totalBookings: bookings.length,
-          totalUsers: users.length,
-          totalTheatres: theatres.length,
-          totalRevenue,
-          recentBookings,
-          popularMovies,
-          upcomingScreenings,
-          bookingStatusData,
-          revenueData,
-          bookingsByMovieData
-        });
-        
-        setIsLoading(false);
-      } catch (error) {
-        console.error('Error loading dashboard data:', error);
-        setIsLoading(false);
       }
-    };
+      
+      setIsLoading(false);
+    }
+  }, [bookingsData, moviesData, theatresData, isLoadingBookings, isLoadingMovies, isLoadingTheatres]);
+  
+  // Recent bookings (last 5)
+  const recentBookings = Array.isArray(bookingsData) 
+    ? [...bookingsData].sort((a, b) => new Date(b.bookingTime) - new Date(a.bookingTime)).slice(0, 5)
+    : [];
+  
+  // Popular movies (films with most bookings)
+  const getPopularMovies = () => {
+    if (!Array.isArray(bookingsData) || !Array.isArray(moviesData)) return [];
     
-    loadDashboardData();
-  }, [isLoadingMovies, isLoadingBookings, isLoadingScreenings, movies, bookings, screenings]);
+    // Count bookings per movie
+    const movieBookingCounts = bookingsData.reduce((acc, booking) => {
+      const movieId = booking.movieId;
+      if (!acc[movieId]) acc[movieId] = 0;
+      acc[movieId]++;
+      return acc;
+    }, {});
+    
+    // Sort movies by booking count and get top 5
+    return moviesData
+      .map(movie => ({
+        ...movie,
+        bookingCount: movieBookingCounts[movie.id] || 0
+      }))
+      .sort((a, b) => b.bookingCount - a.bookingCount)
+      .slice(0, 5);
+  };
   
-  // Define colors for charts
-  const COLORS = ['#2563eb', '#16a34a', '#dc2626', '#ca8a04', '#6366f1'];
+  const popularMovies = getPopularMovies();
   
+  // Loading state
   if (isLoading) {
     return <LoadingSpinner />;
   }
-
+  
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <div className="text-sm text-gray-500">
-          {formatDate(new Date(), { dateStyle: 'full' })}
-        </div>
+        <p className="text-gray-600">Welcome back, {user?.username || 'Admin'}</p>
       </div>
-
+      
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {/* Users */}
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center">
-            <div className="p-3 rounded-full bg-primary-100 text-primary-600">
-              <FilmIcon className="h-6 w-6" />
+            <div className="rounded-full bg-blue-100 p-3 mr-4">
+              <UserIcon className="h-6 w-6 text-blue-600" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Total Movies</p>
-              <p className="text-2xl font-semibold text-gray-900">{stats.totalMovies}</p>
+            <div>
+              <h2 className="text-sm font-medium text-gray-500">Total Users</h2>
+              <p className="text-2xl font-bold text-gray-900">{totalStats.totalUsers}</p>
             </div>
           </div>
           <div className="mt-4">
-            <Link to="/admin/movies" className="text-sm text-primary-600 hover:text-primary-700">
-              View all movies
-            </Link>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-green-100 text-green-600">
-              <TicketIcon className="h-6 w-6" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Total Bookings</p>
-              <p className="text-2xl font-semibold text-gray-900">{stats.totalBookings}</p>
-            </div>
-          </div>
-          <div className="mt-4">
-            <Link to="/admin/bookings" className="text-sm text-primary-600 hover:text-primary-700">
-              View all bookings
-            </Link>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-indigo-100 text-indigo-600">
-              <UserIcon className="h-6 w-6" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Total Users</p>
-              <p className="text-2xl font-semibold text-gray-900">{stats.totalUsers}</p>
-            </div>
-          </div>
-          <div className="mt-4">
-            <Link to="/admin/users" className="text-sm text-primary-600 hover:text-primary-700">
+            <Link 
+              to="/admin/users"
+              className="text-sm text-blue-600 hover:text-blue-700"
+            >
               View all users
             </Link>
           </div>
         </div>
-
+        
+        {/* Movies */}
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center">
-            <div className="p-3 rounded-full bg-yellow-100 text-yellow-600">
-              <BuildingStorefrontIcon className="h-6 w-6" />
+            <div className="rounded-full bg-green-100 p-3 mr-4">
+              <FilmIcon className="h-6 w-6 text-green-600" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Total Theatres</p>
-              <p className="text-2xl font-semibold text-gray-900">{stats.totalTheatres}</p>
+            <div>
+              <h2 className="text-sm font-medium text-gray-500">Total Movies</h2>
+              <p className="text-2xl font-bold text-gray-900">{totalStats.totalMovies}</p>
             </div>
           </div>
           <div className="mt-4">
-            <Link to="/admin/theatres" className="text-sm text-primary-600 hover:text-primary-700">
+            <Link 
+              to="/admin/movies"
+              className="text-sm text-green-600 hover:text-green-700"
+            >
+              View all movies
+            </Link>
+          </div>
+        </div>
+        
+        {/* Theatres */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center">
+            <div className="rounded-full bg-purple-100 p-3 mr-4">
+              <BuildingStorefrontIcon className="h-6 w-6 text-purple-600" />
+            </div>
+            <div>
+              <h2 className="text-sm font-medium text-gray-500">Total Theatres</h2>
+              <p className="text-2xl font-bold text-gray-900">{totalStats.totalTheatres}</p>
+            </div>
+          </div>
+          <div className="mt-4">
+            <Link 
+              to="/admin/theatres"
+              className="text-sm text-purple-600 hover:text-purple-700"
+            >
               View all theatres
             </Link>
           </div>
         </div>
-      </div>
-
-      {/* Revenue & Status Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Revenue Chart */}
+        
+        {/* Bookings */}
         <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Revenue (Last 7 Days)</h2>
-            <div className="flex items-center">
-              <div className="flex items-center mx-2">
-                <ArrowUpIcon className="h-4 w-4 text-green-500 mr-1" />
-                <span className="text-green-500 text-sm font-medium">
-                  {formatCurrency(stats.totalRevenue)}
-                </span>
-              </div>
+          <div className="flex items-center">
+            <div className="rounded-full bg-yellow-100 p-3 mr-4">
+              <TicketIcon className="h-6 w-6 text-yellow-600" />
+            </div>
+            <div>
+              <h2 className="text-sm font-medium text-gray-500">Total Bookings</h2>
+              <p className="text-2xl font-bold text-gray-900">{totalStats.totalBookings}</p>
             </div>
           </div>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={stats.revenueData}
-                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis tickFormatter={(value) => `$${value}`} />
-                <Tooltip formatter={(value) => [`${formatCurrency(value)}`, 'Revenue']} />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="revenue"
-                  stroke="#2563eb"
-                  strokeWidth={2}
-                  activeDot={{ r: 8 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Booking Status Chart */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Booking Status</h2>
-            <div className="flex items-center">
-              <CurrencyDollarIcon className="h-5 w-5 text-yellow-500 mr-1" />
-              <span className="text-yellow-500 text-sm font-medium">
-                {formatCurrency(stats.totalRevenue)}
-              </span>
-            </div>
-          </div>
-          <div className="h-80 flex items-center justify-center">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={stats.bookingStatusData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  outerRadius={120}
-                  fill="#8884d8"
-                  dataKey="value"
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                >
-                  {stats.bookingStatusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => [value, 'Bookings']} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-
-      {/* Popular Movies & Bookings by Movie */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Popular Movies */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="p-6 border-b">
-            <h2 className="text-lg font-semibold text-gray-900">Popular Movies</h2>
-          </div>
-          <div className="divide-y divide-gray-200">
-            {stats.popularMovies.length > 0 ? (
-              stats.popularMovies.map((movie, index) => (
-                <div key={movie.id} className="p-6 flex items-center">
-                  <div className="flex-shrink-0 w-10 h-10 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center">
-                    <span className="font-semibold">{index + 1}</span>
-                  </div>
-                  <div className="ml-4 flex-1">
-                    <h3 className="text-base font-semibold text-gray-900">{movie.title}</h3>
-                    <p className="text-sm text-gray-500">
-                      {movie.genre} • {movie.rating}
-                    </p>
-                  </div>
-                  <div className="ml-4">
-                    <Link to={`/admin/movies/${movie.id}`}>
-                      <Button variant="outline" size="sm">View</Button>
-                    </Link>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="p-6 text-center text-gray-500">No movie data available</div>
-            )}
-          </div>
-        </div>
-
-        {/* Bookings by Movie Chart */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Bookings by Movie</h2>
-            <div className="flex items-center">
-              <CalculatorIcon className="h-5 w-5 text-indigo-500 mr-1" />
-              <span className="text-indigo-500 text-sm font-medium">
-                Total: {stats.totalBookings}
-              </span>
-            </div>
-          </div>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={stats.bookingsByMovieData}
-                layout="vertical"
-                margin={{ top: 5, right: 30, left: 50, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" />
-                <YAxis 
-                  dataKey="name" 
-                  type="category" 
-                  tick={{ fontSize: 12 }}
-                  width={150}
-                />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="value" name="Bookings" fill="#2563eb">
-                  {stats.bookingsByMovieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Bookings & Upcoming Screenings */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Bookings */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="p-6 border-b">
-            <h2 className="text-lg font-semibold text-gray-900">Recent Bookings</h2>
-          </div>
-          <div className="divide-y divide-gray-200">
-            {stats.recentBookings.length > 0 ? (
-              stats.recentBookings.map((booking) => (
-                <div key={booking.id} className="p-6">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="text-base font-semibold text-gray-900">{booking.movieTitle}</h3>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Booked by: {booking.username}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {formatDate(booking.bookingTime)}
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-end">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        booking.paymentStatus === 'COMPLETED' ? 'bg-green-100 text-green-800' :
-                        booking.paymentStatus === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
-                        booking.paymentStatus === 'CANCELLED' ? 'bg-red-100 text-red-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {booking.paymentStatus}
-                      </span>
-                      <span className="text-base font-semibold text-gray-900 mt-1">
-                        {formatCurrency(booking.totalAmount)}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="mt-3">
-                    <Link to={`/admin/bookings/${booking.id}`}>
-                      <Button variant="outline" size="sm">View Details</Button>
-                    </Link>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="p-6 text-center text-gray-500">No recent bookings</div>
-            )}
-          </div>
-          <div className="p-4 bg-gray-50 border-t">
-            <Link to="/admin/bookings" className="text-primary-600 hover:text-primary-700 font-medium text-sm">
+          <div className="mt-4">
+            <Link 
+              to="/admin/bookings"
+              className="text-sm text-yellow-600 hover:text-yellow-700"
+            >
               View all bookings
             </Link>
           </div>
         </div>
-
-        {/* Upcoming Screenings */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="p-6 border-b">
-            <h2 className="text-lg font-semibold text-gray-900">Upcoming Screenings</h2>
+      </div>
+      
+      {/* Booking Status Stats */}
+      <div className="bg-white rounded-lg shadow p-6 mb-8">
+        <h2 className="text-lg font-medium text-gray-900 mb-4">Booking Statistics</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Completed Bookings */}
+          <div className="bg-green-50 rounded-lg p-4">
+            <div className="flex items-center">
+              <div className="rounded-full bg-green-100 p-2 mr-3">
+                <ArrowTrendingUpIcon className="h-5 w-5 text-green-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-500">Completed</h3>
+                <p className="text-xl font-bold text-gray-900">{bookingStats.completed}</p>
+              </div>
+            </div>
           </div>
+          
+          {/* Pending Bookings */}
+          <div className="bg-yellow-50 rounded-lg p-4">
+            <div className="flex items-center">
+              <div className="rounded-full bg-yellow-100 p-2 mr-3">
+                <ClockIcon className="h-5 w-5 text-yellow-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-500">Pending</h3>
+                <p className="text-xl font-bold text-gray-900">{bookingStats.pending}</p>
+              </div>
+            </div>
+          </div>
+          
+          {/* Cancelled Bookings */}
+          <div className="bg-red-50 rounded-lg p-4">
+            <div className="flex items-center">
+              <div className="rounded-full bg-red-100 p-2 mr-3">
+                <ArrowTrendingDownIcon className="h-5 w-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-500">Cancelled</h3>
+                <p className="text-xl font-bold text-gray-900">{bookingStats.cancelled}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Chart could go here in a real implementation */}
+        <div className="h-48 bg-gray-100 rounded-lg mt-6 flex items-center justify-center">
+          <ChartBarIcon className="h-8 w-8 text-gray-400" />
+          <span className="ml-2 text-gray-500">Booking Trends Chart</span>
+        </div>
+      </div>
+      
+      {/* Recent Bookings & Popular Movies */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        {/* Recent Bookings */}
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-medium text-gray-900">Recent Bookings</h2>
+          </div>
+          
           <div className="divide-y divide-gray-200">
-            {stats.upcomingScreenings.length > 0 ? (
-              stats.upcomingScreenings.map((screening) => (
-                <div key={screening.id} className="p-6">
-                  <div className="flex items-start">
-                    <div className="flex-shrink-0">
-                      <div className="w-10 h-10 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center">
-                        <CalendarIcon className="h-5 w-5" />
-                      </div>
-                    </div>
-                    <div className="ml-4">
-                      <h3 className="text-base font-semibold text-gray-900">{screening.movieTitle}</h3>
-                      <p className="text-sm text-gray-500 mt-1">
-                        {screening.theatreName} • Screen {screening.screenNumber}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {formatDate(screening.startTime)}
-                      </p>
-                      <div className="mt-3">
-                        <Link to={`/admin/screenings/${screening.id}`}>
-                          <Button variant="outline" size="sm">View Details</Button>
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
+            {recentBookings.length > 0 ? recentBookings.map(booking => (
+              <div key={booking.id} className="px-6 py-4">
+                <div className="flex justify-between mb-1">
+                  <h3 className="font-medium text-gray-900">{booking.movieTitle}</h3>
+                  <span className={`text-sm px-2 py-1 rounded-full ${
+                    booking.paymentStatus === 'COMPLETED' ? 'bg-green-100 text-green-800' :
+                    booking.paymentStatus === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {booking.paymentStatus}
+                  </span>
                 </div>
-              ))
-            ) : (
-              <div className="p-6 text-center text-gray-500">No upcoming screenings</div>
+                <div className="text-sm text-gray-500">
+                  <p>{booking.username} • {formatDate(booking.bookingTime)}</p>
+                  <p>{formatCurrency(booking.totalAmount)} • {Array.from(booking.bookedSeats || []).length} seats</p>
+                </div>
+              </div>
+            )) : (
+              <div className="px-6 py-8 text-center text-gray-500">
+                No recent bookings found.
+              </div>
             )}
           </div>
-          <div className="p-4 bg-gray-50 border-t">
-            <Link to="/admin/screenings" className="text-primary-600 hover:text-primary-700 font-medium text-sm">
-              View all screenings
+          
+          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+            <Link 
+              to="/admin/bookings"
+              className="text-sm text-blue-600 hover:text-blue-700"
+            >
+              View all bookings
+            </Link>
+          </div>
+        </div>
+        
+        {/* Popular Movies */}
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-medium text-gray-900">Popular Movies</h2>
+          </div>
+          
+          <div className="divide-y divide-gray-200">
+            {popularMovies.length > 0 ? popularMovies.map(movie => (
+              <div key={movie.id} className="px-6 py-4 flex items-center">
+                <div className="flex-shrink-0 h-16 w-12 bg-gray-200 rounded overflow-hidden mr-4">
+                  {movie.posterUrl || movie.posterImageUrl ? (
+                    <img 
+                      src={movie.posterUrl || movie.posterImageUrl} 
+                      alt={movie.title} 
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center">
+                      <FilmIcon className="h-6 w-6 text-gray-400" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-medium text-gray-900 truncate">{movie.title}</h3>
+                  <p className="text-sm text-gray-500">
+                    {movie.bookingCount} bookings
+                  </p>
+                </div>
+                <div className="ml-4">
+                  <Link 
+                    to={`/admin/movies/${movie.id}`}
+                    className="text-sm text-blue-600 hover:text-blue-700"
+                  >
+                    View
+                  </Link>
+                </div>
+              </div>
+            )) : (
+              <div className="px-6 py-8 text-center text-gray-500">
+                No popular movies found.
+              </div>
+            )}
+          </div>
+          
+          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+            <Link 
+              to="/admin/movies"
+              className="text-sm text-blue-600 hover:text-blue-700"
+            >
+              View all movies
             </Link>
           </div>
         </div>
