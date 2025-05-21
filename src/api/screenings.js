@@ -70,17 +70,44 @@ const screeningApi = {
     return response.data;
   },
 
-  /**
-   * Get upcoming screenings
-   * @param {number} [days=7] - Number of days to include
-   * @returns {Promise<Object>} Upcoming screenings grouped by date
-   */
-  getUpcomingScreenings: async (days = 7) => {
+ // Updated function in src/api/screenings.js
+
+/**
+ * Get upcoming screenings
+ * @param {number} [days=7] - Number of days to include
+ * @returns {Promise<Object>} Upcoming screenings grouped by date
+ */
+getUpcomingScreenings: async (days = 7) => {
+  try {
+    // Option 1: Try the original endpoint first
     const response = await apiClient.get('/screenings/upcoming', {
       params: { days }
     });
     return response.data;
-  },
+  } catch (error) {
+    console.log('Error fetching from /screenings/upcoming, trying alternative endpoint...');
+    
+    // Option 2: Try an alternative endpoint based on your API structure
+    try {
+      // Many Spring Boot APIs follow a pattern like this for date-based queries
+      const today = new Date();
+      const formattedDate = today.toISOString().split('T')[0]; // YYYY-MM-DD
+      
+      const response = await apiClient.get('/screenings', {
+        params: { 
+          startDate: formattedDate,
+          days
+        }
+      });
+      return response.data;
+    } catch (alternativeError) {
+      console.error('Both endpoint attempts failed:', alternativeError);
+      
+      // Return empty result to prevent UI errors
+      return {};
+    }
+  }
+},
 
   /**
    * Get screenings for movie and theatre

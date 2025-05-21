@@ -1,5 +1,6 @@
-// src/pages/public/MovieDetails.jsx
-import React from 'react';
+// src/pages/public/MovieDetails.jsx - Updated to handle data mismatches
+
+import React, { useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useMovies } from '@hooks/useMovies';
 import LoadingSpinner from '@components/common/LoadingSpinner';
@@ -17,6 +18,13 @@ const MovieDetailsPage = () => {
     error
   } = useGetMovie(id);
   
+  // Debug movie data
+  useEffect(() => {
+    if (movie) {
+      console.log("Movie details:", movie);
+    }
+  }, [movie]);
+  
   // Loading state
   if (isLoading) {
     return <LoadingSpinner size="lg" />;
@@ -26,6 +34,28 @@ const MovieDetailsPage = () => {
   if (error || !movie) {
     return <NotFound message="Movie not found" />;
   }
+
+  // Extract properties with support for both naming conventions
+  const {
+    title,
+    description,
+    durationMinutes,
+    duration,
+    genre,
+    rating,
+    releaseDate,
+    director,
+    cast,
+    trailerUrl,
+    posterUrl,
+    posterImageUrl
+  } = movie;
+
+  // Use either posterUrl or posterImageUrl (backend might use different property names)
+  const imageUrl = posterUrl || posterImageUrl;
+  
+  // Use either durationMinutes or duration
+  const movieDuration = durationMinutes || duration;
   
   return (
     <div className="container mx-auto px-4 py-8">
@@ -33,10 +63,10 @@ const MovieDetailsPage = () => {
         <div className="flex flex-col md:flex-row gap-8">
           {/* Movie poster */}
           <div className="flex-shrink-0">
-            {movie.posterImageUrl ? (
+            {imageUrl ? (
               <img
-                src={movie.posterImageUrl}
-                alt={`${movie.title} poster`}
+                src={imageUrl}
+                alt={`${title} poster`}
                 className="w-full md:w-64 rounded-lg shadow-lg"
               />
             ) : (
@@ -48,42 +78,42 @@ const MovieDetailsPage = () => {
           
           {/* Movie details */}
           <div className="flex-1">
-            <h1 className="text-3xl font-bold mb-2">{movie.title}</h1>
+            <h1 className="text-3xl font-bold mb-2">{title}</h1>
             
             <div className="flex items-center mb-4 text-sm text-gray-600">
-              {movie.rating && (
-                <span className="mr-3 px-2 py-1 bg-gray-200 rounded">{movie.rating}</span>
+              {rating && (
+                <span className="mr-3 px-2 py-1 bg-gray-200 rounded">{rating}</span>
               )}
-              {movie.genre && (
-                <span className="mr-3">{movie.genre.replace('_', ' ')}</span>
+              {genre && (
+                <span className="mr-3">{genre.replace('_', ' ')}</span>
               )}
-              {movie.durationMinutes && (
-                <span className="mr-3">{formatDuration(movie.durationMinutes)}</span>
+              {movieDuration && (
+                <span className="mr-3">{formatDuration(movieDuration)}</span>
               )}
-              {movie.releaseDate && (
-                <span>{formatDate(movie.releaseDate)}</span>
+              {releaseDate && (
+                <span>{formatDate(releaseDate)}</span>
               )}
             </div>
             
             <h2 className="text-xl font-semibold mb-2">Overview</h2>
-            <p className="text-gray-700 mb-4">{movie.description || 'No description available.'}</p>
+            <p className="text-gray-700 mb-4">{description || 'No description available.'}</p>
             
-            {movie.director && (
+            {director && (
               <div className="mb-2">
-                <span className="font-semibold">Director:</span> {movie.director}
+                <span className="font-semibold">Director:</span> {director}
               </div>
             )}
             
-            {movie.cast && (
+            {cast && (
               <div className="mb-2">
-                <span className="font-semibold">Cast:</span> {movie.cast}
+                <span className="font-semibold">Cast:</span> {cast}
               </div>
             )}
             
-            {movie.trailerUrl && (
+            {trailerUrl && (
               <div className="mt-6">
                 <a
-                  href={movie.trailerUrl}
+                  href={trailerUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700"

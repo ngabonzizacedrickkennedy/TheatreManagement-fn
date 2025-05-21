@@ -1,3 +1,5 @@
+// src/components/features/movies/MovieCarousel.jsx - Updated to handle data mismatch
+
 import PropTypes from 'prop-types';
 import { useState, useRef, useEffect } from 'react';
 import MovieCard from './MovieCard';
@@ -9,8 +11,11 @@ const MovieCarousel = ({ movies, slidesToShow = 1 }) => {
   const [isTouching, setIsTouching] = useState(false);
   const carouselRef = useRef(null);
 
+  // Validate movies have id property
+  const validMovies = movies.filter(movie => movie && (movie.id !== undefined));
+
   // Total number of slides
-  const totalSlides = Math.ceil(movies.length / slidesToShow);
+  const totalSlides = Math.ceil(validMovies.length / slidesToShow);
 
   // Handle next slide
   const nextSlide = () => {
@@ -71,11 +76,10 @@ const MovieCarousel = ({ movies, slidesToShow = 1 }) => {
     setIsTouching(false);
   };
 
-  // Calculate visible movies
-  const visibleMovies = () => {
-    const start = currentIndex * slidesToShow;
-    return movies.slice(start, start + slidesToShow);
-  };
+  // If there are no valid movies, don't render the carousel
+  if (validMovies.length === 0) {
+    return null;
+  }
 
   return (
     <div className="relative group">
@@ -93,7 +97,7 @@ const MovieCarousel = ({ movies, slidesToShow = 1 }) => {
         >
           {/* We render the movies in chunks */}
           {Array.from({ length: totalSlides }).map((_, index) => {
-            const slideMovies = movies.slice(
+            const slideMovies = validMovies.slice(
               index * slidesToShow, 
               index * slidesToShow + slidesToShow
             );
@@ -104,7 +108,7 @@ const MovieCarousel = ({ movies, slidesToShow = 1 }) => {
                 className="min-w-full flex justify-center gap-4 px-2"
               >
                 {slideMovies.map(movie => (
-                  <div key={movie.id} className="w-full max-w-xs">
+                  <div key={movie.id || `movie-${Math.random()}`} className="w-full max-w-xs">
                     <MovieCard movie={movie} />
                   </div>
                 ))}
@@ -157,10 +161,10 @@ const MovieCarousel = ({ movies, slidesToShow = 1 }) => {
 MovieCarousel.propTypes = {
   movies: PropTypes.arrayOf(
     PropTypes.shape({
-      id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
-      title: PropTypes.string.isRequired,
-      posterImageUrl: PropTypes.string,
-      // Other movie properties
+      id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      title: PropTypes.string,
+      posterUrl: PropTypes.string,
+      posterImageUrl: PropTypes.string // Support both naming conventions
     })
   ).isRequired,
   slidesToShow: PropTypes.number

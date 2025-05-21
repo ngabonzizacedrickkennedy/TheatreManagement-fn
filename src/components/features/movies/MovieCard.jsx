@@ -1,30 +1,53 @@
+// src/components/features/movies/MovieCard.jsx - Updated component
+
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 import classNames from 'classnames';
 
 /**
  * MovieCard component for displaying movie information in a card format
+ * Updated to handle different property naming conventions from API
  */
 const MovieCard = ({
   id,
   title,
   posterUrl,
+  posterImageUrl, // Add support for both naming conventions
   genre,
   rating,
   releaseDate,
   duration,
+  durationMinutes, // Add support for both naming conventions
   className = '',
   isUpcoming = false,
-  linkToDetails = true
+  linkToDetails = true,
+  movie // Allow passing the entire movie object
 }) => {
+  // If movie object is provided, extract properties
+  if (movie) {
+    id = movie.id;
+    title = movie.title;
+    posterUrl = movie.posterUrl || movie.posterImageUrl;
+    genre = movie.genre;
+    rating = movie.rating;
+    releaseDate = movie.releaseDate;
+    duration = movie.duration || movie.durationMinutes;
+    isUpcoming = movie.status === 'UPCOMING' || isUpcoming;
+  }
+
+  // Use posterImageUrl as fallback if posterUrl is not provided
+  const imageSrc = posterUrl || posterImageUrl;
+  // Use durationMinutes as fallback if duration is not provided
+  const movieDuration = duration || durationMinutes;
+
   // Card content
   const cardContent = (
     <>
       <div className="relative aspect-[2/3] overflow-hidden rounded-t-lg">
         {/* Movie poster */}
-        {posterUrl ? (
+        {imageSrc ? (
           <img
-            src={posterUrl}
+            src={imageSrc}
             alt={`${title} poster`}
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
@@ -59,16 +82,16 @@ const MovieCard = ({
         <div className="flex flex-col text-sm text-gray-500 space-y-1">
           {/* Genre */}
           {genre && (
-            <span className="line-clamp-1">{genre}</span>
+            <span className="line-clamp-1">{genre.replace('_', ' ')}</span>
           )}
           
           {/* Duration and release info */}
           <div className="flex items-center space-x-2">
-            {duration && (
-              <span>{formatDuration(duration)}</span>
+            {movieDuration && (
+              <span>{formatDuration(movieDuration)}</span>
             )}
             
-            {duration && releaseDate && (
+            {movieDuration && releaseDate && (
               <span>•</span>
             )}
             
@@ -137,16 +160,19 @@ const MovieCard = ({
 };
 
 MovieCard.propTypes = {
-  id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
-  title: PropTypes.string.isRequired,
+  id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  title: PropTypes.string,
   posterUrl: PropTypes.string,
+  posterImageUrl: PropTypes.string, // Support both naming conventions
   genre: PropTypes.string,
   rating: PropTypes.string,
   releaseDate: PropTypes.string,
   duration: PropTypes.number,
+  durationMinutes: PropTypes.number, // Support both naming conventions
   className: PropTypes.string,
   isUpcoming: PropTypes.bool,
-  linkToDetails: PropTypes.bool
+  linkToDetails: PropTypes.bool,
+  movie: PropTypes.object // Allow passing the entire movie object
 };
 
 export default MovieCard;

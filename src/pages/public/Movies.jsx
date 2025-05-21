@@ -1,6 +1,7 @@
-// src/pages/public/Movies.jsx
+// src/pages/public/Movies.jsx - Updated to handle data mismatches
+
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useMovies } from '@hooks/useMovies';
 import { useScreenings } from '@hooks/useScreenings';
 import MovieCard from '@components/features/movies/MovieCard';
@@ -12,9 +13,19 @@ import { formatDate, formatEnumValue } from '@utils/formatUtils';
 import { FilmIcon, CalendarIcon, ClockIcon } from '@heroicons/react/24/outline';
 
 const MoviesPage = () => {
+  const location = useLocation();
   const [selectedGenre, setSelectedGenre] = useState(null);
   const [selectedDate, setSelectedDate] = useState('');
   const [activeTab, setActiveTab] = useState(0);
+  
+  // Check URL params for status filter
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const status = params.get('status');
+    if (status === 'upcoming') {
+      setActiveTab(1); // Set to "Coming Soon" tab
+    }
+  }, [location]);
   
   const { useGetMovies, useGetGenres } = useMovies();
   const { useGetUpcomingScreenings } = useScreenings();
@@ -49,14 +60,29 @@ const MoviesPage = () => {
     }
   }, [today]);
 
+  // Debug movies data
+  useEffect(() => {
+    if (movies.length > 0) {
+      console.log("Sample movie data:", movies[0]);
+    }
+  }, [movies]);
+
   // Filter movies by genre if selected
   const filteredMovies = selectedGenre
     ? movies.filter(movie => movie.genre === selectedGenre)
     : movies;
   
   // Group movies into "Now Playing" and "Coming Soon" categories
-  const nowPlayingMovies = filteredMovies.filter(movie => movie.status === 'NOW_PLAYING');
-  const upcomingMovies = filteredMovies.filter(movie => movie.status === 'UPCOMING');
+  // Add fallback logic to handle missing status property
+  const nowPlayingMovies = filteredMovies.filter(movie => 
+    movie.status === 'NOW_PLAYING' || 
+    (movie.releaseDate && new Date(movie.releaseDate) <= new Date())
+  );
+  
+  const upcomingMovies = filteredMovies.filter(movie => 
+    movie.status === 'UPCOMING' || 
+    (movie.releaseDate && new Date(movie.releaseDate) > new Date())
+  );
   
   // Get screenings for selected date
   const screeningsForSelectedDate = upcomingScreenings[selectedDate] || [];
@@ -79,7 +105,7 @@ const MoviesPage = () => {
   const moviesTabContent = (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
       {(activeTab === 0 ? nowPlayingMovies : upcomingMovies).map(movie => (
-        <MovieCard key={movie.id} movie={movie} />
+        <MovieCard key={movie.id || `movie-${Math.random()}`} movie={movie} />
       ))}
     </div>
   );
@@ -130,7 +156,7 @@ const MoviesPage = () => {
         <div className="space-y-6">
           {Object.entries(screeningsByMovie).map(([movieId, screenings]) => {
             // Find the movie info
-            const movie = movies.find(m => m.id.toString() === movieId);
+            const movie = movies.find(m => m.id && m.id.toString() === movieId.toString());
             if (!movie) return null;
             
             return (
@@ -138,9 +164,9 @@ const MoviesPage = () => {
                 <div className="md:flex">
                   {/* Movie poster */}
                   <div className="md:flex-shrink-0 h-48 md:h-auto md:w-48 bg-gray-200">
-                    {movie.posterImageUrl ? (
+                    {(movie.posterUrl || movie.posterImageUrl) ? (
                       <img 
-                        src={movie.posterImageUrl} 
+                        src={movie.posterUrl || movie.posterImageUrl} 
                         alt={movie.title} 
                         className="h-full w-full object-cover"
                       />
@@ -160,8 +186,8 @@ const MoviesPage = () => {
                           {movie.genre && (
                             <span className="mr-2">{formatEnumValue(movie.genre)}</span>
                           )}
-                          {movie.durationMinutes && (
-                            <span>{movie.durationMinutes} min</span>
+                          {(movie.durationMinutes || movie.duration) && (
+                            <span>{movie.durationMinutes || movie.duration} min</span>
                           )}
                         </div>
                         
@@ -247,7 +273,7 @@ const MoviesPage = () => {
             content: screeningsTabContent
           }
         ]}
-        defaultTab={0}
+        defaultTab={activeTab}
         onChange={setActiveTab}
       />
       

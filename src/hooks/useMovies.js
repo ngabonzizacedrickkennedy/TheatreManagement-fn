@@ -14,7 +14,25 @@ export const useMovies = () => {
   const useGetMovies = (params = {}, options = {}) => {
     return useQuery({
       queryKey: ['movies', params],
-      queryFn: () => movieApi.getMovies(params),
+      queryFn: async () => {
+        const data = await movieApi.getMovies(params);
+        // Map API response to expected component props
+        return Array.isArray(data) ? data.map(movie => ({
+          id: movie.id,
+          title: movie.title,
+          posterUrl: movie.posterImageUrl, // Map posterImageUrl to posterUrl
+          genre: movie.genre,
+          rating: movie.rating,
+          releaseDate: movie.releaseDate,
+          duration: movie.durationMinutes,
+          description: movie.description,
+          status: movie.status || 'NOW_PLAYING', // Default status
+          durationMinutes: movie.durationMinutes,
+          director: movie.director,
+          cast: movie.cast,
+          trailerUrl: movie.trailerUrl
+        })) : [];
+      },
       ...options
     });
   };
@@ -25,7 +43,25 @@ export const useMovies = () => {
   const useGetMovie = (id, options = {}) => {
     return useQuery({
       queryKey: ['movie', id],
-      queryFn: () => movieApi.getMovieById(id),
+      queryFn: async () => {
+        const movie = await movieApi.getMovieById(id);
+        // Map API response to expected component props
+        return movie ? {
+          id: movie.id,
+          title: movie.title,
+          posterUrl: movie.posterImageUrl, // Map posterImageUrl to posterUrl
+          genre: movie.genre,
+          rating: movie.rating,
+          releaseDate: movie.releaseDate,
+          duration: movie.durationMinutes,
+          description: movie.description,
+          status: movie.status || 'NOW_PLAYING', // Default status
+          durationMinutes: movie.durationMinutes,
+          director: movie.director,
+          cast: movie.cast,
+          trailerUrl: movie.trailerUrl
+        } : null;
+      },
       enabled: !!id,
       ...options
     });
@@ -130,3 +166,5 @@ export const useMovies = () => {
     useDeleteMovie
   };
 };
+
+export default useMovies;

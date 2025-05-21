@@ -1,3 +1,5 @@
+// src/pages/public/Home.jsx - Updated to handle potential data mismatches
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useMovies } from '@hooks/useMovies';
@@ -44,6 +46,16 @@ const Home = () => {
     data: upcomingScreenings = {}, 
     isLoading: isLoadingScreenings 
   } = useGetUpcomingScreenings();
+
+  // Debug information
+  useEffect(() => {
+    if (nowPlayingMovies.length > 0) {
+      console.log("Now playing movies sample:", nowPlayingMovies[0]);
+    }
+    if (upcomingMovies.length > 0) {
+      console.log("Upcoming movies sample:", upcomingMovies[0]);
+    }
+  }, [nowPlayingMovies, upcomingMovies]);
 
   // Filter movies by genre if a genre is selected
   const filteredNowPlayingMovies = selectedGenre
@@ -98,7 +110,7 @@ const Home = () => {
                 // Desktop view: Grid
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                   {filteredNowPlayingMovies.slice(0, 8).map(movie => (
-                    <MovieCard key={movie.id} movie={movie} />
+                    <MovieCard key={movie.id || `movie-${Math.random()}`} movie={movie} />
                   ))}
                 </div>
               )}
@@ -158,7 +170,7 @@ const Home = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                 {upcomingMovies.slice(0, 4).map(movie => (
                   <MovieCard 
-                    key={movie.id} 
+                    key={movie.id || `movie-${Math.random()}`} 
                     movie={movie} 
                     isUpcoming={true} 
                   />
