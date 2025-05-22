@@ -1,3 +1,5 @@
+
+// src/api/index.js - Updated with search API
 /**
  * Main API index file
  * Export all API services for easy import
@@ -13,6 +15,7 @@ import screeningApi from './screenings';
 import seatApi from './seats';
 import theatreApi from './theatres';
 import userApi from './users';
+import searchApi from './search'; // New search API
 
 export {
   apiClient,
@@ -24,7 +27,8 @@ export {
   screeningApi,
   seatApi,
   theatreApi,
-  userApi
+  userApi,
+  searchApi // Export search API
 };
 
 // Export default as a combined API object
@@ -37,5 +41,6 @@ export default {
   screenings: screeningApi,
   seats: seatApi,
   theatres: theatreApi,
-  users: userApi
+  users: userApi,
+  search: searchApi // Add search API
 };

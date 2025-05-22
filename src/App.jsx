@@ -1,4 +1,4 @@
-// src/App.jsx - Updated routes
+// src/App.jsx - Updated routes with search page
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
@@ -14,11 +14,12 @@ import RoleBasedRoute from '@components/routing/RoleBasedRoute';
 import Home from '@pages/public/Home';
 import MoviesPage from '@pages/public/Movies';
 import MovieDetailsPage from '@pages/public/MovieDetails';
+import SearchResultsPage from '@pages/public/SearchResults'; // New search results page
 import LoginPage from '@pages/auth/Login';
 import RegisterPage from '@pages/auth/Register';
-import TwoFactorAuthPage from '@pages/auth/TwoFactorAuth'; // New 2FA page
-import ForgotPasswordPage from '@pages/auth/ForgotPassword'; // New forgot password page
-import ResetPasswordPage from '@pages/auth/ResetPassword'; // New reset password page
+import TwoFactorAuthPage from '@pages/auth/TwoFactorAuth';
+import ForgotPasswordPage from '@pages/auth/ForgotPassword';
+import ResetPasswordPage from '@pages/auth/ResetPassword';
 import AboutPage from '@pages/public/About';
 import ContactPage from '@pages/public/Contact';
 import NotFoundPage from '@pages/public/NotFound';
@@ -90,11 +91,12 @@ const router = createBrowserRouter([
       { index: true, element: <Home /> },
       { path: 'movies', element: <MoviesPage /> },
       { path: 'movies/:id', element: <MovieDetailsPage /> },
+      { path: 'search', element: <SearchResultsPage /> }, // New search route
       { path: 'login', element: <LoginPage /> },
       { path: 'register', element: <RegisterPage /> },
-      { path: 'two-factor-auth', element: <TwoFactorAuthPage /> }, // New 2FA route
-      { path: 'forgot-password', element: <ForgotPasswordPage /> }, // New forgot password route
-      { path: 'reset-password', element: <ResetPasswordPage /> }, // New reset password route
+      { path: 'two-factor-auth', element: <TwoFactorAuthPage /> },
+      { path: 'forgot-password', element: <ForgotPasswordPage /> },
+      { path: 'reset-password', element: <ResetPasswordPage /> },
       { path: 'about', element: <AboutPage /> },
       { path: 'contact', element: <ContactPage /> },
       

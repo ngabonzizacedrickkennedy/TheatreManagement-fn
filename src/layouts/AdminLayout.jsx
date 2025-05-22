@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Link, NavLink, useLocation, Outlet } from 'react-router-dom';
+import { Link, NavLink, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
 import useResponsive from '@hooks/useResponsive';
+import GlobalSearch from '@components/common/GlobalSearch';
 
 // Icons
 import { 
@@ -13,12 +14,15 @@ import {
   CalendarIcon,
   Bars3Icon,
   XMarkIcon,
-  ArrowLeftOnRectangleIcon
+  ArrowLeftOnRectangleIcon,
+  HomeIcon,
+  MagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
 
 const AdminLayout = () => {
   const { user, logout, isAdmin } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const { isMobile } = useResponsive();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   
@@ -32,6 +36,13 @@ const AdminLayout = () => {
   // Handle logout
   const handleLogout = () => {
     logout();
+    navigate('/');
+  };
+
+  // Handle search navigation
+  const handleSearchNavigate = (path) => {
+    navigate(path);
+    setSidebarOpen(false); // Close sidebar if open
   };
   
   // Navigation items (base items for all admin users)
@@ -53,9 +64,20 @@ const AdminLayout = () => {
     <div className="h-full flex flex-col bg-gray-800">
       {/* Logo */}
       <div className="h-16 bg-gray-900 flex items-center px-4">
-        <Link to="/admin" className="text-white text-xl font-bold">
-          THMS Admin
+        <Link to="/admin" className="flex items-center space-x-2">
+          <FilmIcon className="h-8 w-8 text-white" />
+          <span className="text-white text-xl font-bold">THMS Admin</span>
         </Link>
+      </div>
+      
+      {/* Admin Search - Sidebar */}
+      <div className="p-4 border-b border-gray-700">
+        <GlobalSearch
+          userRole={user?.role}
+          onNavigate={handleSearchNavigate}
+          className="w-full"
+          placeholder="Search admin content..."
+        />
       </div>
       
       {/* Navigation */}
@@ -67,7 +89,7 @@ const AdminLayout = () => {
               to={item.to}
               end={item.exact}
               className={({ isActive }) => 
-                `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
+                `group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors duration-200 ${
                   isActive 
                     ? 'bg-gray-900 text-white' 
                     : 'text-gray-300 hover:bg-gray-700 hover:text-white'
@@ -86,18 +108,30 @@ const AdminLayout = () => {
         <div className="flex items-center">
           <div className="flex-shrink-0">
             <div className="h-9 w-9 rounded-full bg-gray-700 flex items-center justify-center text-white font-medium">
-              {user?.username?.charAt(0).toUpperCase() || 'A'}
+              {user?.firstName?.charAt(0) || user?.username?.charAt(0).toUpperCase() || 'A'}
             </div>
           </div>
-          <div className="ml-3">
-            <p className="text-sm font-medium text-white">{user?.username || 'Admin'}</p>
-            <button
-              onClick={handleLogout}
-              className="text-xs font-medium text-gray-300 hover:text-white flex items-center mt-1"
-            >
-              <ArrowLeftOnRectangleIcon className="w-4 h-4 mr-1" />
-              Logout
-            </button>
+          <div className="ml-3 flex-1">
+            <p className="text-sm font-medium text-white">
+              {user?.firstName ? `${user.firstName} ${user.lastName}` : user?.username || 'Admin'}
+            </p>
+            <div className="flex items-center space-x-2 mt-1">
+              <button
+                onClick={handleLogout}
+                className="text-xs font-medium text-gray-300 hover:text-white flex items-center transition-colors duration-200"
+              >
+                <ArrowLeftOnRectangleIcon className="w-4 h-4 mr-1" />
+                Logout
+              </button>
+              <span className="text-gray-500">•</span>
+              <Link
+                to="/"
+                className="text-xs font-medium text-gray-300 hover:text-white flex items-center transition-colors duration-200"
+              >
+                <HomeIcon className="w-4 h-4 mr-1" />
+                View Site
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -157,23 +191,38 @@ const AdminLayout = () => {
         <div className="relative z-10 flex-shrink-0 flex h-16 bg-white shadow">
           <button
             type="button"
-            className="md:hidden px-4 border-r border-gray-200 text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500"
+            className="md:hidden px-4 border-r border-gray-200 text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500 transition-colors duration-200"
             onClick={() => setSidebarOpen(true)}
           >
             <span className="sr-only">Open sidebar</span>
             <Bars3Icon className="h-6 w-6" aria-hidden="true" />
           </button>
           
-          <div className="flex-1 px-4 flex justify-between">
+          <div className="flex-1 px-4 flex justify-between items-center">
             <div className="flex-1 flex items-center">
-              {/* Page title could go here */}
+              {/* Mobile Search */}
+              <div className="md:hidden max-w-md w-full">
+                <GlobalSearch
+                  userRole={user?.role}
+                  onNavigate={handleSearchNavigate}
+                  className="w-full"
+                  placeholder="Search..."
+                />
+              </div>
             </div>
-            <div className="ml-4 flex items-center md:ml-6">
-              {/* Header controls could go here (notifications, etc.) */}
+            <div className="ml-4 flex items-center md:ml-6 space-x-4">
+              {/* Quick Actions */}
+              <Link 
+                to="/admin/movies/create"
+                className="hidden md:inline-flex items-center px-3 py-1 border border-transparent rounded-md text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 transition-colors duration-200"
+              >
+                Add Movie
+              </Link>
               <Link 
                 to="/"
-                className="ml-3 inline-flex items-center px-3 py-1 border border-transparent rounded-md text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+                className="inline-flex items-center px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors duration-200"
               >
+                <HomeIcon className="w-4 h-4 mr-1" />
                 View Site
               </Link>
             </div>

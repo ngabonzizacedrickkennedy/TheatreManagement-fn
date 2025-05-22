@@ -167,7 +167,7 @@ const AdminScreeningsPage = () => {
   return (
     <div>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4 md:mb-0">Screenings now un the system</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-4 md:mb-0">Screenings </h1>
         <Link to="/admin/screenings/create">
           <Button 
             variant="primary"
