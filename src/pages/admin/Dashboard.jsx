@@ -60,26 +60,18 @@ const {
   isLoading: isLoadingUsers 
 } = useGetAllUsers();
 
-// Mock users data (fallback if API fails)
-const mockUsers = [
-  { id: 1, username: 'johndoe', role: 'ROLE_USER' },
-  { id: 2, username: 'janedoe', role: 'ROLE_USER' },
-  { id: 3, username: 'admin', role: 'ROLE_ADMIN' },
-  { id: 4, username: 'manager', role: 'ROLE_MANAGER' },
-  { id: 5, username: 'bobsmith', role: 'ROLE_USER' }
-];
-
 // Process data when it's loaded
 useEffect(() => {
-  if (!isLoadingBookings && !isLoadingMovies && !isLoadingTheatres) {
+  if (!isLoadingBookings && !isLoadingMovies && !isLoadingTheatres && !isLoadingUsers) {
     console.log('Processing dashboard data...');
     console.log('Bookings data:', bookingsData);
     console.log('Movies data:', moviesData);
     console.log('Theatres data:', theatresData);
-    
+    console.log('Users data:', usersData);
+
     // Calculate total stats
     setTotalStats({
-      totalUsers: mockUsers.length, // Replace with actual user count
+      totalUsers: Array.isArray(usersData) ? usersData.length : 0,
       totalMovies: Array.isArray(moviesData) ? moviesData.length : 0,
       totalTheatres: Array.isArray(theatresData) ? theatresData.length : 0,
       totalBookings: Array.isArray(bookingsData) ? bookingsData.length : 0
