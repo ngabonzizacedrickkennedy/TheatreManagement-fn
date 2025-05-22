@@ -1,7 +1,8 @@
-// src/pages/admin/Users/View.jsx
-import { useState, useEffect } from 'react';
+// src/pages/admin/Users/View.jsx - Updated to use real data
+import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useToast } from '@contexts/ToastContext';
+import { useGetUser, useDeleteUser } from '@hooks/useUsers';
 import Button from '@components/common/Button';
 import LoadingSpinner from '@components/common/LoadingSpinner';
 import NotFound from '@components/common/NotFound';
@@ -12,7 +13,8 @@ import {
   UserIcon,
   EnvelopeIcon,
   PhoneIcon,
-  TicketIcon
+  TicketIcon,
+  CalendarIcon
 } from '@heroicons/react/24/outline';
 import { formatDate } from '@utils/formatUtils';
 
@@ -20,93 +22,79 @@ const ViewUserPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { showSuccess, showError } = useToast();
-  const [isLoading, setIsLoading] = useState(true);
-  const [user, setUser] = useState(null);
-  const [bookings, setBookings] = useState([]);
-  const [error, setError] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false);
   
-  // Mock API function to get user details
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        setIsLoading(true);
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Mock data
-        const userData = {
-          id,
-          username: 'johndoe',
-          email: 'john@example.com',
-          firstName: 'John',
-          lastName: 'Doe',
-          phoneNumber: '+1 555-123-4567',
-          role: 'ROLE_USER',
-          createdAt: '2023-01-15T10:30:00Z'
-        };
-        
-        // Mock bookings for this user
-        const userBookings = [
-          {
-            id: 1,
-            bookingNumber: 'BK10012345',
-            movieTitle: 'The Matrix Resurrections',
-            screeningTime: '2023-03-20T14:30:00Z',
-            totalAmount: 35.50,
-            paymentStatus: 'COMPLETED'
-          },
-          {
-            id: 2,
-            bookingNumber: 'BK10012346',
-            movieTitle: 'Spider-Man: No Way Home',
-            screeningTime: '2023-03-25T19:00:00Z',
-            totalAmount: 42.00,
-            paymentStatus: 'PENDING'
-          }
-        ];
-        
-        setUser(userData);
-        setBookings(userBookings);
-        setIsLoading(false);
-      } catch (err) {
-        setError(err.message || 'Failed to load user details');
-        setIsLoading(false);
-      }
-    };
-    
-    fetchUser();
-  }, [id]);
+  // Fetch user data
+  const {
+    data: userData,
+    isLoading,
+    error,
+    refetch
+  } = useGetUser(id, {
+    retry: 1,
+    refetchOnWindowFocus: false
+  });
+  
+  // Delete user mutation
+  const deleteUserMutation = useDeleteUser({
+    onSuccess: () => {
+      showSuccess('User deleted successfully');
+      navigate('/admin/users');
+    },
+    onError: (error) => {
+      showError(error.message || 'Failed to delete user');
+    }
+  });
   
   // Handle user deletion
   const handleDeleteUser = async () => {
-    if (!window.confirm('Are you sure you want to delete this user?')) {
+    if (!userData?.user) return;
+    
+    const user = userData.user;
+    
+    if (user.role === 'ROLE_ADMIN') {
+      showError('Cannot delete admin users');
       return;
     }
     
-    setIsDeleting(true);
-    
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      showSuccess('User deleted successfully');
-      navigate('/admin/users');
-    } catch (error) {
-      showError(error.message || 'Failed to delete user');
-      setIsDeleting(false);
+    if (!window.confirm(`Are you sure you want to delete user "${user.username}"?`)) {
+      return;
     }
+    
+    deleteUserMutation.mutate(user.id);
   };
   
   // Loading state
   if (isLoading) {
-    return <LoadingSpinner />;
+    return (
+      <div className="flex justify-center items-center py-12">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
   }
   
   // Error state
-  if (error || !user) {
-    return <NotFound message="User not found" />;
+  if (error || !userData) {
+    return (
+      <div className="p-12 text-center">
+        <NotFound 
+          title="User not found"
+          message="The user you're looking for doesn't exist or you don't have permission to view it."
+          showHomeButton={false}
+        />
+        <div className="mt-4">
+          <Button
+            variant="primary"
+            onClick={() => navigate('/admin/users')}
+          >
+            Back to Users
+          </Button>
+        </div>
+      </div>
+    );
   }
+  
+  const user = userData.user;
+  const bookings = userData.bookings || [];
   
   return (
     <div>
@@ -144,7 +132,7 @@ const ViewUserPage = () => {
                         ? 'bg-yellow-100 text-yellow-800'
                         : 'bg-green-100 text-green-800'
                   }`}>
-                    {user.role.replace('ROLE_', '')}
+                    {user.role?.replace('ROLE_', '') || 'USER'}
                   </span>
                 </div>
               </div>
@@ -162,13 +150,15 @@ const ViewUserPage = () => {
                   </div>
                 </div>
                 
-                <div className="flex items-start">
-                  <PhoneIcon className="h-5 w-5 text-gray-400 mt-0.5 mr-3" />
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-900">Phone</h4>
-                    <p className="text-gray-600">{user.phoneNumber}</p>
+                {user.phoneNumber && (
+                  <div className="flex items-start">
+                    <PhoneIcon className="h-5 w-5 text-gray-400 mt-0.5 mr-3" />
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-900">Phone</h4>
+                      <p className="text-gray-600">{user.phoneNumber}</p>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
               
               <div className="mt-6 pt-6 border-t border-gray-200">
@@ -176,9 +166,16 @@ const ViewUserPage = () => {
                 
                 <div className="space-y-4">
                   <div>
-                    <h4 className="text-sm font-medium text-gray-900">Member Since</h4>
-                    <p className="text-gray-600">{formatDate(user.createdAt)}</p>
+                    <h4 className="text-sm font-medium text-gray-900">User ID</h4>
+                    <p className="text-gray-600">#{user.id}</p>
                   </div>
+                  
+                  {user.createdAt && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-900">Member Since</h4>
+                      <p className="text-gray-600">{formatDate(user.createdAt)}</p>
+                    </div>
+                  )}
                 </div>
               </div>
               
@@ -197,8 +194,9 @@ const ViewUserPage = () => {
                   variant="danger" 
                   size="sm"
                   icon={<TrashIcon className="h-5 w-5 mr-1" />}
-                  loading={isDeleting}
+                  loading={deleteUserMutation.isLoading}
                   onClick={handleDeleteUser}
+                  disabled={user.role === 'ROLE_ADMIN'}
                 >
                   Delete
                 </Button>
@@ -211,7 +209,12 @@ const ViewUserPage = () => {
         <div className="lg:col-span-2">
           <div className="bg-white rounded-lg shadow overflow-hidden">
             <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">Bookings</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-900">Bookings</h2>
+                <div className="text-sm text-gray-500">
+                  {bookings.length} total booking{bookings.length !== 1 ? 's' : ''}
+                </div>
+              </div>
             </div>
             
             <div className="p-6">
@@ -220,14 +223,36 @@ const ViewUserPage = () => {
                   {bookings.map(booking => (
                     <div key={booking.id} className="py-4">
                       <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="text-base font-semibold text-gray-900">{booking.movieTitle}</h3>
-                          <p className="text-sm text-gray-500 mt-1">
-                            Booking #: {booking.bookingNumber}
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            {formatDate(booking.screeningTime)}
-                          </p>
+                        <div className="flex-1">
+                          <div className="flex items-center">
+                            <TicketIcon className="h-5 w-5 text-gray-400 mr-2" />
+                            <h3 className="text-base font-semibold text-gray-900">
+                              {booking.movieTitle || 'Movie Booking'}
+                            </h3>
+                          </div>
+                          <div className="mt-1 space-y-1">
+                            <p className="text-sm text-gray-500">
+                              Booking #: {booking.bookingNumber || booking.id}
+                            </p>
+                            {booking.screeningTime && (
+                              <div className="flex items-center text-sm text-gray-500">
+                                <CalendarIcon className="h-4 w-4 mr-1" />
+                                {formatDate(booking.screeningTime)}
+                              </div>
+                            )}
+                            {booking.theatreName && (
+                              <p className="text-sm text-gray-500">
+                                Theatre: {booking.theatreName}
+                              </p>
+                            )}
+                            {booking.bookedSeats && booking.bookedSeats.length > 0 && (
+                              <p className="text-sm text-gray-500">
+                                Seats: {Array.isArray(booking.bookedSeats) 
+                                  ? booking.bookedSeats.join(', ') 
+                                  : booking.bookedSeats}
+                              </p>
+                            )}
+                          </div>
                         </div>
                         <div className="flex flex-col items-end">
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -236,11 +261,13 @@ const ViewUserPage = () => {
                             booking.paymentStatus === 'CANCELLED' ? 'bg-red-100 text-red-800' :
                             'bg-gray-100 text-gray-800'
                           }`}>
-                            {booking.paymentStatus}
+                            {booking.paymentStatus || 'UNKNOWN'}
                           </span>
-                          <span className="text-base font-semibold text-gray-900 mt-1">
-                            ${booking.totalAmount.toFixed(2)}
-                          </span>
+                          {booking.totalAmount && (
+                            <span className="text-base font-semibold text-gray-900 mt-1">
+                              ${booking.totalAmount.toFixed(2)}
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="mt-3">
@@ -266,6 +293,41 @@ const ViewUserPage = () => {
                   </p>
                 </div>
               )}
+            </div>
+          </div>
+          
+          {/* Statistics card */}
+          <div className="mt-6 bg-white rounded-lg shadow overflow-hidden">
+            <div className="p-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">User Statistics</h3>
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center p-3 bg-gray-50 rounded-lg">
+                  <div className="text-2xl font-bold text-gray-900">{bookings.length}</div>
+                  <div className="text-sm text-gray-500">Total Bookings</div>
+                </div>
+                
+                <div className="text-center p-3 bg-gray-50 rounded-lg">
+                  <div className="text-2xl font-bold text-green-600">
+                    {bookings.filter(b => b.paymentStatus === 'COMPLETED').length}
+                  </div>
+                  <div className="text-sm text-gray-500">Completed</div>
+                </div>
+                
+                <div className="text-center p-3 bg-gray-50 rounded-lg">
+                  <div className="text-2xl font-bold text-yellow-600">
+                    {bookings.filter(b => b.paymentStatus === 'PENDING').length}
+                  </div>
+                  <div className="text-sm text-gray-500">Pending</div>
+                </div>
+                
+                <div className="text-center p-3 bg-gray-50 rounded-lg">
+                  <div className="text-2xl font-bold text-gray-900">
+                    ${bookings.reduce((total, booking) => total + (booking.totalAmount || 0), 0).toFixed(2)}
+                  </div>
+                  <div className="text-sm text-gray-500">Total Spent</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

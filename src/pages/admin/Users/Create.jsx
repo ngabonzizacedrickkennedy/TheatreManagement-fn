@@ -1,8 +1,9 @@
-// src/pages/admin/Users/Create.jsx
+// src/pages/admin/Users/Create.jsx - Updated to use real data
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useToast } from '@contexts/ToastContext';
+import { useCreateUser } from '@hooks/useUsers';
 import Button from '@components/common/Button';
 import Input from '@components/common/Input';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
@@ -10,7 +11,6 @@ import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 const CreateUserPage = () => {
   const navigate = useNavigate();
   const { showSuccess, showError } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Form handling
   const {
@@ -34,31 +34,28 @@ const CreateUserPage = () => {
   // Watch password for confirmation validation
   const password = watch('password');
   
-  // Mock API function to create a user
-  const createUser = async (data) => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    return { id: Date.now(), ...data };
-  };
+  // Create user mutation
+  const createUserMutation = useCreateUser({
+    onSuccess: (data) => {
+      showSuccess('User created successfully');
+      navigate('/admin/users');
+    },
+    onError: (error) => {
+      showError(error.message || 'Failed to create user');
+    }
+  });
   
   // Form submission handler
   const onSubmit = async (data) => {
-    try {
-      setIsSubmitting(true);
-      
-      // Remove confirmPassword before sending to API
-      const { confirmPassword, ...userData } = data;
-      
-      // Create user
-      await createUser(userData);
-      
-      showSuccess('User created successfully');
-      navigate('/admin/users');
-    } catch (error) {
-      showError(error.message || 'Failed to create user');
-    } finally {
-      setIsSubmitting(false);
+    // Remove confirmPassword before sending to API
+    const { confirmPassword, ...userData } = data;
+    
+    // Convert role string to proper format if needed
+    if (userData.role && !userData.role.startsWith('ROLE_')) {
+      userData.role = `ROLE_${userData.role}`;
     }
+    
+    createUserMutation.mutate(userData);
   };
   
   return (
@@ -243,7 +240,8 @@ const CreateUserPage = () => {
             <Button
               type="submit"
               variant="primary"
-              loading={isSubmitting}
+              loading={createUserMutation.isLoading}
+              disabled={createUserMutation.isLoading}
             >
               Create User
             </Button>

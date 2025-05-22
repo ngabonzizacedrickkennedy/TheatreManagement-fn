@@ -1,7 +1,9 @@
-// src/pages/admin/Users/List.jsx
+// src/pages/admin/Users/List.jsx - Updated to use real data
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useToast } from '@contexts/ToastContext';
+import { useGetAllUsers, useDeleteUser } from '@hooks/useUsers';
+import { formatDate } from '@utils/formatUtils';
 import Button from '@components/common/Button';
 import LoadingSpinner from '@components/common/LoadingSpinner';
 import {
@@ -17,60 +19,6 @@ import {
   FunnelIcon
 } from '@heroicons/react/24/outline';
 
-// Mock user data since we don't have a real users API hook
-const MOCK_USERS = [
-  { 
-    id: 1, 
-    username: 'johndoe', 
-    email: 'john@example.com',
-    firstName: 'John',
-    lastName: 'Doe',
-    phoneNumber: '+1 555-123-4567',
-    role: 'ROLE_USER',
-    createdAt: '2023-01-15T10:30:00Z'
-  },
-  { 
-    id: 2, 
-    username: 'janedoe', 
-    email: 'jane@example.com',
-    firstName: 'Jane',
-    lastName: 'Doe',
-    phoneNumber: '+1 555-987-6543',
-    role: 'ROLE_USER',
-    createdAt: '2023-02-20T14:45:00Z'
-  },
-  { 
-    id: 3, 
-    username: 'adminuser', 
-    email: 'admin@example.com',
-    firstName: 'Admin',
-    lastName: 'User',
-    phoneNumber: '+1 555-789-0123',
-    role: 'ROLE_ADMIN',
-    createdAt: '2023-01-01T08:00:00Z'
-  },
-  { 
-    id: 4, 
-    username: 'manager', 
-    email: 'manager@example.com',
-    firstName: 'Theatre',
-    lastName: 'Manager',
-    phoneNumber: '+1 555-456-7890',
-    role: 'ROLE_MANAGER',
-    createdAt: '2023-01-10T09:15:00Z'
-  },
-  { 
-    id: 5, 
-    username: 'bobsmith', 
-    email: 'bob@example.com',
-    firstName: 'Bob',
-    lastName: 'Smith',
-    phoneNumber: '+1 555-234-5678',
-    role: 'ROLE_USER',
-    createdAt: '2023-03-05T11:20:00Z'
-  }
-];
-
 const UserList = () => {
   const { showSuccess, showError } = useToast();
   
@@ -79,19 +27,46 @@ const UserList = () => {
   const [selectedRole, setSelectedRole] = useState('');
   const [sortBy, setSortBy] = useState('username');
   const [sortOrder, setSortOrder] = useState('asc');
-  const [isLoading, setIsLoading] = useState(false);
-  const [users, setUsers] = useState(MOCK_USERS);
   
-  // Mock delete function
-  const handleDeleteUser = (id) => {
-    if (window.confirm('Are you sure you want to delete this user?')) {
-      setIsLoading(true);
-      // Simulate API call
-      setTimeout(() => {
-        setUsers(users.filter(user => user.id !== id));
-        setIsLoading(false);
-        showSuccess('User deleted successfully');
-      }, 1000);
+  // Build query parameters for API call
+  const queryParams = {
+    search: searchQuery || undefined,
+    role: selectedRole || undefined,
+    sortBy,
+    sortOrder
+  };
+  
+  // Fetch users data
+  const {
+    data: users = [],
+    isLoading,
+    error,
+    refetch
+  } = useGetAllUsers(queryParams, {
+    retry: 2,
+    refetchOnWindowFocus: false
+  });
+  
+  // Delete user mutation
+  const deleteUserMutation = useDeleteUser({
+    onSuccess: () => {
+      showSuccess('User deleted successfully');
+      refetch(); // Refetch the users list
+    },
+    onError: (error) => {
+      showError(error.message || 'Failed to delete user');
+    }
+  });
+  
+  // Handle delete user
+  const handleDeleteUser = (user) => {
+    if (user.role === 'ROLE_ADMIN') {
+      showError('Cannot delete admin users');
+      return;
+    }
+    
+    if (window.confirm(`Are you sure you want to delete user "${user.username}"?`)) {
+      deleteUserMutation.mutate(user.id);
     }
   };
   
@@ -117,50 +92,37 @@ const UserList = () => {
     }
   };
   
-  // Filter and sort users
-  const filteredUsers = users
-    .filter(user => {
-      // Search filter
-      const searchMatch = searchQuery === '' || 
-        user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        `${user.firstName} ${user.lastName}`.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      // Role filter
-      const roleMatch = selectedRole === '' || user.role === selectedRole;
-      
-      return searchMatch && roleMatch;
-    })
-    .sort((a, b) => {
-      // Sort by selected field
-      let comparison = 0;
-      
-      switch (sortBy) {
-        case 'username':
-          comparison = a.username.localeCompare(b.username);
-          break;
-        case 'fullName':
-          comparison = `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`);
-          break;
-        case 'email':
-          comparison = a.email.localeCompare(b.email);
-          break;
-        case 'role':
-          comparison = a.role.localeCompare(b.role);
-          break;
-        case 'createdAt':
-          comparison = new Date(a.createdAt) - new Date(b.createdAt);
-          break;
-        default:
-          comparison = a.username.localeCompare(b.username);
-      }
-      
-      // Apply sort order
-      return sortOrder === 'asc' ? comparison : -comparison;
-    });
+  // Reset filters
+  const resetFilters = () => {
+    setSearchQuery('');
+    setSelectedRole('');
+    setSortBy('username');
+    setSortOrder('asc');
+  };
   
+  // Loading state
   if (isLoading) {
-    return <LoadingSpinner />;
+    return (
+      <div className="flex justify-center items-center py-12">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+  
+  // Error state
+  if (error) {
+    return (
+      <div className="p-12 text-center">
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-100 mb-4">
+          <ExclamationCircleIcon className="h-8 w-8 text-red-400" />
+        </div>
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Failed to load users</h3>
+        <p className="text-gray-500 mb-6">{error.message || 'An error occurred while loading users.'}</p>
+        <Button variant="primary" onClick={() => refetch()}>
+          Try Again
+        </Button>
+      </div>
+    );
   }
   
   return (
@@ -221,10 +183,7 @@ const UserList = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  setSearchQuery('');
-                  setSelectedRole('');
-                }}
+                onClick={resetFilters}
                 disabled={!searchQuery && !selectedRole}
               >
                 Reset Filters
@@ -236,7 +195,7 @@ const UserList = () => {
       
       {/* Users list */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        {filteredUsers.length > 0 ? (
+        {users.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -299,7 +258,7 @@ const UserList = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredUsers.map(user => (
+                {users.map(user => (
                   <tr key={user.id}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -312,10 +271,14 @@ const UserList = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{`${user.firstName} ${user.lastName}`}</div>
+                      <div className="text-sm text-gray-900">{`${user.firstName || ''} ${user.lastName || ''}`.trim()}</div>
                       <div className="text-xs text-gray-500 flex items-center">
-                        <PhoneIcon className="h-3 w-3 mr-1" />
-                        {user.phoneNumber}
+                        {user.phoneNumber && (
+                          <>
+                            <PhoneIcon className="h-3 w-3 mr-1" />
+                            {user.phoneNumber}
+                          </>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -332,7 +295,7 @@ const UserList = () => {
                             ? 'bg-yellow-100 text-yellow-800'
                             : 'bg-green-100 text-green-800'
                       }`}>
-                        {user.role.replace('ROLE_', '')}
+                        {user.role?.replace('ROLE_', '') || 'USER'}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -355,8 +318,9 @@ const UserList = () => {
                           variant="danger" 
                           size="sm"
                           icon={<TrashIcon className="h-4 w-4" />}
-                          onClick={() => handleDeleteUser(user.id)}
-                          disabled={user.role === 'ROLE_ADMIN'} // Prevent deleting admins
+                          onClick={() => handleDeleteUser(user)}
+                          disabled={user.role === 'ROLE_ADMIN' || deleteUserMutation.isLoading}
+                          loading={deleteUserMutation.isLoading && deleteUserMutation.variables === user.id}
                         >
                           Delete
                         </Button>
