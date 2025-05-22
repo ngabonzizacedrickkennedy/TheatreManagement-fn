@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { Link, NavLink, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
 import useResponsive from '@hooks/useResponsive';
 import GlobalSearch from '@components/common/GlobalSearch';
+import { Menu, Transition } from '@headlessui/react';
+import classNames from 'classnames';
 
 // Icons
 import { 
@@ -13,7 +15,10 @@ import {
   Bars3Icon,
   XMarkIcon,
   InformationCircleIcon,
-  PhoneIcon
+  PhoneIcon,
+  ChevronDownIcon,
+  Cog6ToothIcon,
+  ArrowRightOnRectangleIcon
 } from '@heroicons/react/24/outline';
 
 const MainLayout = () => {
@@ -39,59 +44,112 @@ const MainLayout = () => {
     setMobileMenuOpen(false); // Close mobile menu if open
   };
   
-  // Navigation items
-  const navigationItems = [
-    { name: 'Home', to: '/', icon: <HomeIcon className="w-5 h-5" /> },
-    { name: 'Movies', to: '/movies', icon: <FilmIcon className="w-5 h-5" /> },
-    { name: 'About', to: '/about', icon: <InformationCircleIcon className="w-5 h-5" /> },
-    { name: 'Contact', to: '/contact', icon: <PhoneIcon className="w-5 h-5" /> },
+  // Main navigation items
+  const mainNavigationItems = [
+    { name: 'Home', to: '/', icon: <HomeIcon className="w-4 h-4" /> },
+    { name: 'Movies', to: '/movies', icon: <FilmIcon className="w-4 h-4" /> }
+  ];
+
+  // Secondary navigation items (for dropdown on desktop)
+  const secondaryNavigationItems = [
+    { name: 'About', to: '/about', icon: <InformationCircleIcon className="w-4 h-4" /> },
+    { name: 'Contact', to: '/contact', icon: <PhoneIcon className="w-4 h-4" /> }
   ];
   
   // User navigation items (when authenticated)
   const userNavigationItems = [
-    { name: 'My Bookings', to: '/bookings', icon: <TicketIcon className="w-5 h-5" /> },
-    { name: 'Profile', to: '/profile', icon: <UserIcon className="w-5 h-5" /> },
+    { name: 'My Bookings', to: '/bookings', icon: <TicketIcon className="w-4 h-4" /> },
+    { name: 'Profile', to: '/profile', icon: <UserIcon className="w-4 h-4" /> }
+  ];
+
+  // User dropdown menu items
+  const userDropdownItems = [
+    ...userNavigationItems,
+    { name: 'Settings', to: '/settings', icon: <Cog6ToothIcon className="w-4 h-4" /> },
+    { type: 'divider' },
+    { name: 'Sign out', action: handleLogout, icon: <ArrowRightOnRectangleIcon className="w-4 h-4" /> }
   ];
   
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
+          <div className="flex justify-between items-center h-16">
             {/* Logo and main navigation */}
-            <div className="flex items-center">
+            <div className="flex items-center space-x-8">
               {/* Logo */}
-              <div className="flex-shrink-0 flex items-center">
+              <div className="flex-shrink-0">
                 <Link to="/" className="flex items-center space-x-2">
                   <FilmIcon className="h-8 w-8 text-primary-600" />
-                  <span className="text-2xl font-bold text-primary-600">THMS</span>
+                  <span className="text-xl font-bold text-primary-600">THMS</span>
                 </Link>
               </div>
               
-              {/* Desktop Navigation */}
-              <nav className="hidden md:ml-8 md:flex md:space-x-8">
-                {navigationItems.map((item) => (
+              {/* Desktop Navigation - Compact */}
+              <nav className="hidden md:flex items-center space-x-6">
+                {/* Main navigation items */}
+                {mainNavigationItems.map((item) => (
                   <NavLink
                     key={item.name}
                     to={item.to}
                     className={({ isActive }) => 
-                      `inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors duration-200 ${
+                      classNames(
+                        'inline-flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200',
                         isActive 
-                          ? 'border-primary-500 text-gray-900' 
-                          : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                      }`
+                          ? 'bg-primary-50 text-primary-700' 
+                          : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                      )
                     }
                   >
-                    <span className="mr-2">{item.icon}</span>
-                    {item.name}
+                    {item.icon}
+                    <span>{item.name}</span>
                   </NavLink>
                 ))}
+
+                {/* More dropdown for secondary items */}
+                <Menu as="div" className="relative">
+                  <Menu.Button className="inline-flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200">
+                    <span>More</span>
+                    <ChevronDownIcon className="w-4 h-4" />
+                  </Menu.Button>
+                  
+                  <Transition
+                    as={Fragment}
+                    enter="transition ease-out duration-100"
+                    enterFrom="transform opacity-0 scale-95"
+                    enterTo="transform opacity-100 scale-100"
+                    leave="transition ease-in duration-75"
+                    leaveFrom="transform opacity-100 scale-100"
+                    leaveTo="transform opacity-0 scale-95"
+                  >
+                    <Menu.Items className="absolute left-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
+                      <div className="py-1">
+                        {secondaryNavigationItems.map((item) => (
+                          <Menu.Item key={item.name}>
+                            {({ active }) => (
+                              <Link
+                                to={item.to}
+                                className={classNames(
+                                  'flex items-center space-x-2 px-4 py-2 text-sm',
+                                  active ? 'bg-gray-100 text-gray-900' : 'text-gray-700'
+                                )}
+                              >
+                                {item.icon}
+                                <span>{item.name}</span>
+                              </Link>
+                            )}
+                          </Menu.Item>
+                        ))}
+                      </div>
+                    </Menu.Items>
+                  </Transition>
+                </Menu>
               </nav>
             </div>
 
-            {/* Global Search - Desktop */}
-            <div className="hidden md:flex flex-1 max-w-md mx-8">
+            {/* Global Search - Expanded on Desktop */}
+            <div className="hidden md:flex flex-1 max-w-lg mx-8">
               <GlobalSearch
                 userRole={user?.role}
                 onNavigate={handleSearchNavigate}
@@ -100,63 +158,100 @@ const MainLayout = () => {
             </div>
             
             {/* User navigation */}
-            <div className="hidden md:ml-6 md:flex md:items-center">
+            <div className="hidden md:flex items-center space-x-3">
               {isAuthenticated ? (
-                <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-3">
                   {/* Admin Link */}
                   {hasRole(['ROLE_ADMIN', 'ROLE_MANAGER']) && (
                     <Link
                       to="/admin"
-                      className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50"
+                      className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 transition-colors duration-200"
                     >
-                      Admin Panel
+                      Admin
                     </Link>
                   )}
 
-                  {/* User navigation */}
-                  {userNavigationItems.map((item) => (
-                    <NavLink
-                      key={item.name}
-                      to={item.to}
-                      className={({ isActive }) => 
-                        `inline-flex items-center px-3 py-1 rounded-md text-sm font-medium transition-colors duration-200 ${
-                          isActive 
-                            ? 'bg-primary-50 text-primary-700' 
-                            : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
-                        }`
-                      }
-                    >
-                      <span className="mr-2">{item.icon}</span>
-                      {item.name}
-                    </NavLink>
-                  ))}
+                  {/* Quick Bookings Link */}
+                  <Link
+                    to="/bookings"
+                    className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200"
+                  >
+                    <TicketIcon className="w-4 h-4" />
+                    <span>Bookings</span>
+                  </Link>
                   
                   {/* User Menu Dropdown */}
-                  <div className="relative ml-3">
-                    <div className="flex items-center">
-                      <div className="h-8 w-8 rounded-full bg-primary-500 flex items-center justify-center text-white font-medium text-sm">
+                  <Menu as="div" className="relative">
+                    <Menu.Button className="flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200">
+                      <div className="h-7 w-7 rounded-full bg-primary-500 flex items-center justify-center text-white font-medium text-xs">
                         {user?.firstName?.charAt(0) || user?.username?.charAt(0).toUpperCase() || 'U'}
                       </div>
-                      <button
-                        onClick={handleLogout}
-                        className="ml-2 inline-flex items-center px-3 py-1 border border-transparent rounded-md text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors duration-200"
-                      >
-                        Logout
-                      </button>
-                    </div>
-                  </div>
+                      <span className="hidden lg:inline">
+                        {user?.firstName || user?.username}
+                      </span>
+                      <ChevronDownIcon className="w-4 h-4" />
+                    </Menu.Button>
+                    
+                    <Transition
+                      as={Fragment}
+                      enter="transition ease-out duration-100"
+                      enterFrom="transform opacity-0 scale-95"
+                      enterTo="transform opacity-100 scale-100"
+                      leave="transition ease-in duration-75"
+                      leaveFrom="transform opacity-100 scale-100"
+                      leaveTo="transform opacity-0 scale-95"
+                    >
+                      <Menu.Items className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
+                        <div className="py-1">
+                          {userDropdownItems.map((item, index) => (
+                            item.type === 'divider' ? (
+                              <div key={`divider-${index}`} className="border-t border-gray-100 my-1" />
+                            ) : (
+                              <Menu.Item key={item.name}>
+                                {({ active }) => (
+                                  item.action ? (
+                                    <button
+                                      onClick={item.action}
+                                      className={classNames(
+                                        'flex items-center space-x-2 w-full px-4 py-2 text-sm text-left',
+                                        active ? 'bg-gray-100 text-gray-900' : 'text-gray-700'
+                                      )}
+                                    >
+                                      {item.icon}
+                                      <span>{item.name}</span>
+                                    </button>
+                                  ) : (
+                                    <Link
+                                      to={item.to}
+                                      className={classNames(
+                                        'flex items-center space-x-2 px-4 py-2 text-sm',
+                                        active ? 'bg-gray-100 text-gray-900' : 'text-gray-700'
+                                      )}
+                                    >
+                                      {item.icon}
+                                      <span>{item.name}</span>
+                                    </Link>
+                                  )
+                                )}
+                              </Menu.Item>
+                            )
+                          ))}
+                        </div>
+                      </Menu.Items>
+                    </Transition>
+                  </Menu>
                 </div>
               ) : (
-                <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-3">
                   <Link
                     to="/login"
-                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-md text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors duration-200"
+                    className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors duration-200"
                   >
-                    Log in
+                    Sign in
                   </Link>
                   <Link
                     to="/register"
-                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 transition-colors duration-200"
+                    className="inline-flex items-center px-4 py-2 rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 transition-colors duration-200"
                   >
                     Sign up
                   </Link>
@@ -185,7 +280,7 @@ const MainLayout = () => {
         
         {/* Mobile menu */}
         {isMobile && mobileMenuOpen && (
-          <div className="md:hidden border-t border-gray-200">
+          <div className="md:hidden border-t border-gray-200 bg-white">
             {/* Mobile Search */}
             <div className="px-4 py-3 border-b border-gray-200">
               <GlobalSearch
@@ -198,27 +293,28 @@ const MainLayout = () => {
 
             {/* Mobile Navigation */}
             <div className="pt-2 pb-3 space-y-1">
-              {navigationItems.map((item) => (
+              {[...mainNavigationItems, ...secondaryNavigationItems].map((item) => (
                 <NavLink
                   key={item.name}
                   to={item.to}
                   className={({ isActive }) => 
-                    `flex items-center pl-3 pr-4 py-2 border-l-4 text-base font-medium transition-colors duration-200 ${
+                    classNames(
+                      'flex items-center space-x-3 pl-3 pr-4 py-3 border-l-4 text-base font-medium transition-colors duration-200',
                       isActive 
                         ? 'bg-primary-50 border-primary-500 text-primary-700' 
-                        : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
-                    }`
+                        : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800'
+                    )
                   }
                 >
-                  <span className="mr-3">{item.icon}</span>
-                  {item.name}
+                  {item.icon}
+                  <span>{item.name}</span>
                 </NavLink>
               ))}
             </div>
             
             {isAuthenticated ? (
               <div className="pt-4 pb-3 border-t border-gray-200">
-                <div className="flex items-center px-4">
+                <div className="flex items-center px-4 mb-3">
                   <div className="flex-shrink-0">
                     <div className="h-10 w-10 rounded-full bg-primary-500 flex items-center justify-center text-white font-medium">
                       {user?.firstName?.charAt(0) || user?.username?.charAt(0).toUpperCase() || 'U'}
@@ -231,14 +327,15 @@ const MainLayout = () => {
                     <div className="text-sm text-gray-500">{user?.email}</div>
                   </div>
                 </div>
-                <div className="mt-3 space-y-1">
+                <div className="space-y-1">
                   {/* Admin Link for Mobile */}
                   {hasRole(['ROLE_ADMIN', 'ROLE_MANAGER']) && (
                     <Link
                       to="/admin"
-                      className="flex items-center pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-primary-600 hover:bg-primary-50 hover:border-primary-300 hover:text-primary-700"
+                      className="flex items-center space-x-3 pl-3 pr-4 py-3 border-l-4 border-transparent text-base font-medium text-primary-600 hover:bg-primary-50 hover:border-primary-300"
                     >
-                      Admin Panel
+                      <Cog6ToothIcon className="w-5 h-5" />
+                      <span>Admin Panel</span>
                     </Link>
                   )}
 
@@ -247,22 +344,24 @@ const MainLayout = () => {
                       key={item.name}
                       to={item.to}
                       className={({ isActive }) => 
-                        `flex items-center pl-3 pr-4 py-2 border-l-4 text-base font-medium transition-colors duration-200 ${
+                        classNames(
+                          'flex items-center space-x-3 pl-3 pr-4 py-3 border-l-4 text-base font-medium transition-colors duration-200',
                           isActive 
                             ? 'bg-primary-50 border-primary-500 text-primary-700' 
-                            : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
-                        }`
+                            : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800'
+                        )
                       }
                     >
-                      <span className="mr-3">{item.icon}</span>
-                      {item.name}
+                      {item.icon}
+                      <span>{item.name}</span>
                     </NavLink>
                   ))}
                   <button
                     onClick={handleLogout}
-                    className="flex items-center w-full pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700 transition-colors duration-200"
+                    className="flex items-center space-x-3 w-full pl-3 pr-4 py-3 border-l-4 border-transparent text-base font-medium text-red-600 hover:bg-red-50 hover:border-red-300 transition-colors duration-200"
                   >
-                    Logout
+                    <ArrowRightOnRectangleIcon className="w-5 h-5" />
+                    <span>Sign out</span>
                   </button>
                 </div>
               </div>
@@ -271,13 +370,13 @@ const MainLayout = () => {
                 <div className="space-y-1 px-4">
                   <Link
                     to="/login"
-                    className="flex items-center py-2 text-base font-medium text-gray-500 hover:text-gray-700 transition-colors duration-200"
+                    className="flex items-center py-3 text-base font-medium text-gray-600 hover:text-gray-800 transition-colors duration-200"
                   >
-                    Log in
+                    Sign in
                   </Link>
                   <Link
                     to="/register"
-                    className="flex items-center py-2 text-base font-medium text-primary-600 hover:text-primary-700 transition-colors duration-200"
+                    className="flex items-center py-3 text-base font-medium text-primary-600 hover:text-primary-700 transition-colors duration-200"
                   >
                     Sign up
                   </Link>
