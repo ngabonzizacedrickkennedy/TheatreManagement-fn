@@ -1,4 +1,4 @@
-// src/contexts/AuthContext.jsx - Debug version with better error handling
+// src/contexts/AuthContext.jsx - Fixed version with better error handling
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import authApi from '@api/auth';
 
@@ -64,28 +64,38 @@ export const AuthProvider = ({ children }) => {
       const response = await authApi.initiateLogin({ username, password });
       console.log('Initiate login response:', response); // Debug log
       
-      if (response.success && response.data.requires2FA) {
+      // Check if 2FA is required
+      if (response.requires2FA) {
         setTwoFactorData({
           username,
           password,
-          email: response.data.email
+          email: response.email
         });
         return { success: true, requires2FA: true };
       }
       
-      // If 2FA is not required for some reason, handle normal login
-      const { token, username: user, roles } = response.data;
+      // If 2FA is not required, check if we have token data directly in response
+      if (response.token && response.username) {
+        // Direct login without 2FA
+        const { token, username: user, roles } = response;
+        
+        // Store auth data
+        localStorage.setItem('auth_token', token);
+        
+        const userData = { username: user, roles };
+        localStorage.setItem('user', JSON.stringify(userData));
+        
+        setToken(token);
+        setUser(userData);
+        
+        return { success: true, requires2FA: false };
+      }
       
-      // Store auth data
-      localStorage.setItem('auth_token', token);
+      // If we get here, something unexpected happened
+      console.error('Unexpected login response structure:', response);
+      setError('Unexpected response from server');
+      return { success: false, error: 'Unexpected response from server' };
       
-      const userData = { username: user, roles };
-      localStorage.setItem('user', JSON.stringify(userData));
-      
-      setToken(token);
-      setUser(userData);
-      
-      return { success: true, requires2FA: false };
     } catch (err) {
       console.error('Initiate login error:', err); // Debug log
       setError(err.message || 'Login failed');
@@ -114,7 +124,23 @@ export const AuthProvider = ({ children }) => {
       const response = await authApi.verifyOtp({ username, password, otp });
       console.log('Verify OTP response:', response); // Debug log
       
-      const { token, username: user, roles } = response.data;
+      // Handle both possible response structures
+      let tokenData;
+      if (response.data) {
+        // If response has data property
+        tokenData = response.data;
+      } else {
+        // If response is direct
+        tokenData = response;
+      }
+      
+      const { token, username: user, roles } = tokenData;
+      
+      if (!token) {
+        console.error('No token in OTP verification response:', response);
+        setError('Invalid response from server');
+        return false;
+      }
       
       // Store auth data
       localStorage.setItem('auth_token', token);
@@ -206,16 +232,31 @@ export const AuthProvider = ({ children }) => {
       const response = await authApi.validateResetToken({ token });
       console.log('Token validation response:', response); // Debug log
       
-      if (response.success) {
-        return { valid: true, data: response.data };
+      // The response is already the extracted data from API client
+      // Check if the response has valid: true directly
+      if (response && response.valid === true) {
+        console.log('Token validation successful, data:', response); // Debug log
+        return { valid: true, data: response };
       } else {
-        console.log('Token validation failed:', response.message); // Debug log
-        return { valid: false, error: response.message || 'Invalid token' };
+        console.log('Token validation failed, response:', response); // Debug log
+        const errorMsg = response?.message || 'Invalid token';
+        setError(errorMsg);
+        return { valid: false, error: errorMsg };
       }
     } catch (err) {
       console.error('Token validation error:', err); // Debug log
-      setError(err.message || 'Invalid or expired token');
-      return { valid: false, error: err.message || 'Invalid or expired token' };
+      
+      // Handle different error response formats
+      let errorMessage = 'Invalid or expired token';
+      
+      if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      return { valid: false, error: errorMessage };
     } finally {
       setLoading(false);
     }

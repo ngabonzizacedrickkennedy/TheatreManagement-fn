@@ -34,9 +34,24 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => {
     // Extract data from the response for easier consumption
-    if (response.data?.data !== undefined) {
+    // But handle the password reset endpoints specially
+    if (response.config.url?.includes('/auth/password/')) {
+      // For password reset endpoints, preserve the full response structure
+      console.log('Password reset endpoint response:', response.data);
+      
+      // Check if it's a successful response with data
+      if (response.data?.success && response.data?.data) {
+        response.data = response.data.data;
+      } else if (response.data?.success === false) {
+        // Keep error responses as-is for proper error handling
+        // Don't extract data for error responses
+      }
+      // If no success field, assume the response is already in the correct format
+    } else if (response.data?.data !== undefined) {
+      // For other endpoints, extract data as before
       response.data = response.data.data;
     }
+    
     return response;
   },
   (error) => {

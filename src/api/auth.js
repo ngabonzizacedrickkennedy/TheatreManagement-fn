@@ -1,4 +1,4 @@
-// src/api/auth.js - Debug version with better error handling
+// src/api/auth.js - Fixed version with better error handling
 import apiClient from './client';
 
 /**
@@ -117,6 +117,12 @@ const authApi = {
       console.log('API validating reset token:', data.token); // Debug log
       const response = await apiClient.post('/auth/password/validate-token', data);
       console.log('API token validation response:', response); // Debug log
+      
+      // The API client interceptor extracts response.data, but we need to check
+      // if it's extracting correctly for this endpoint
+      console.log('Raw response.data:', response.data); // Debug log
+      
+      // Return the response data directly since the interceptor should have extracted it
       return response.data;
     } catch (error) {
       console.error('API token validation error:', error); // Debug log
@@ -126,11 +132,14 @@ const authApi = {
         status: error.response?.status
       });
       
-      // Return a more detailed error response
+      // Return a structured error response
       if (error.response?.data) {
+        // If the server returned an error response, throw it with the message
         throw new Error(error.response.data.message || 'Token validation failed');
       }
-      throw error;
+      
+      // For network or other errors
+      throw new Error('Unable to validate token. Please check your connection and try again.');
     }
   },
 
