@@ -33,7 +33,7 @@ import AdminDashboardPage from '@pages/admin/Dashboard';
 
 // Admin Movies Pages
 import { 
-  MovieList as AdminMoviesPage,
+  SimplifiedList as AdminMoviesPage,
   CreateMovie as AdminMoviesCreatePage,
   EditMovie as AdminMoviesEditPage,
   ViewMovie as AdminMoviesViewPage
