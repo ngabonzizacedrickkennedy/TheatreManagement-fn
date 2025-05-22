@@ -1,31 +1,99 @@
-// src/api/screenings.js - Improved version with better error handling and format compatibility
+// src/api/screenings.js - Updated with pagination support
 import apiClient from './client';
 
 /**
- * Screening API service with robust error handling
+ * Screening API service with pagination support
  * Handles all screening-related operations
  */
 const screeningApi = {
   /**
-   * Get all screenings with optional filtering
+   * Get all screenings with optional filtering and pagination
    * @param {Object} params - Query parameters
    * @param {number} [params.movieId] - Filter by movie ID
    * @param {number} [params.theatreId] - Filter by theatre ID
    * @param {string} [params.date] - Filter by date (YYYY-MM-DD)
-   * @returns {Promise<Array>} List of screenings
+   * @param {string} [params.search] - Search query
+   * @param {string} [params.sortBy='startTime'] - Sort field
+   * @param {string} [params.sortOrder='asc'] - Sort order (asc/desc)
+   * @param {number} [params.page=0] - Page number (0-based)
+   * @param {number} [params.size=10] - Page size
+   * @returns {Promise<Object>} Paginated screenings response
    */
   getScreenings: async (params = {}) => {
     try {
       const response = await apiClient.get('/screenings', { params });
       
-      // Normalize response data
+      // Normalize response data - handle both paginated and non-paginated responses
       const responseData = response.data || {};
-      return Array.isArray(responseData) ? responseData : 
-             Array.isArray(responseData.data) ? responseData.data : 
-             Array.isArray(responseData.screenings) ? responseData.screenings : [];
+      
+      // If it's a paginated response from admin endpoint
+      if (responseData.screenings && Array.isArray(responseData.screenings)) {
+        return {
+          screenings: responseData.screenings,
+          currentPage: responseData.currentPage || 0,
+          totalPages: responseData.totalPages || 1,
+          totalElements: responseData.totalElements || responseData.screenings.length,
+          pageSize: responseData.pageSize || params.size || 10,
+          hasNext: responseData.hasNext || false,
+          hasPrevious: responseData.hasPrevious || false,
+          isFirst: responseData.isFirst || true,
+          isLast: responseData.isLast || true
+        };
+      }
+      
+      // If it's a simple array response
+      if (Array.isArray(responseData)) {
+        return {
+          screenings: responseData,
+          currentPage: 0,
+          totalPages: 1,
+          totalElements: responseData.length,
+          pageSize: responseData.length,
+          hasNext: false,
+          hasPrevious: false,
+          isFirst: true,
+          isLast: true
+        };
+      }
+      
+      // Fallback
+      return {
+        screenings: [],
+        currentPage: 0,
+        totalPages: 0,
+        totalElements: 0,
+        pageSize: params.size || 10,
+        hasNext: false,
+        hasPrevious: false,
+        isFirst: true,
+        isLast: true
+      };
     } catch (error) {
       console.error('Error fetching screenings:', error);
-      return [];
+      throw error;
+    }
+  },
+
+  /**
+   * Get admin screenings with pagination (for admin panel)
+   * @param {Object} params - Query parameters
+   * @param {number} [params.movieId] - Filter by movie ID
+   * @param {number} [params.theatreId] - Filter by theatre ID
+   * @param {string} [params.date] - Filter by date (YYYY-MM-DD)
+   * @param {string} [params.search] - Search query
+   * @param {string} [params.sortBy='startTime'] - Sort field
+   * @param {string} [params.sortOrder='asc'] - Sort order (asc/desc)
+   * @param {number} [params.page=0] - Page number (0-based)
+   * @param {number} [params.size=10] - Page size
+   * @returns {Promise<Object>} Paginated screenings response with metadata
+   */
+  getAdminScreenings: async (params = {}) => {
+    try {
+      const response = await apiClient.get('/admin/screenings', { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching admin screenings:', error);
+      throw error;
     }
   },
 
@@ -75,16 +143,22 @@ const screeningApi = {
   },
 
   /**
-   * Get screenings for a movie
+   * Get screenings for a movie with pagination
    * @param {number|string} movieId - Movie ID
+   * @param {Object} [pagination] - Pagination options
+   * @param {number} [pagination.page=0] - Page number
+   * @param {number} [pagination.size=10] - Page size
    * @param {number} [days=7] - Number of days to include
    * @returns {Promise<Object>} Movie screenings grouped by date
    */
-  getMovieScreenings: async (movieId, days = 7) => {
+  getMovieScreenings: async (movieId, pagination = {}, days = 7) => {
     try {
-      const response = await apiClient.get(`/movies/${movieId}/screenings`, {
-        params: { days }
-      });
+      const params = {
+        days,
+        page: pagination.page || 0,
+        size: pagination.size || 10
+      };
+      const response = await apiClient.get(`/movies/${movieId}/screenings`, { params });
       
       // Normalize response data
       const responseData = response.data || {};
@@ -98,13 +172,18 @@ const screeningApi = {
   },
 
   /**
-   * Get screenings for a theatre
+   * Get screenings for a theatre with pagination
    * @param {number|string} theatreId - Theatre ID
-   * @returns {Promise<Array>} List of screenings
+   * @param {Object} [pagination] - Pagination options
+   * @returns {Promise<Object>} Paginated theatre screenings
    */
-  getTheatreScreenings: async (theatreId) => {
+  getTheatreScreenings: async (theatreId, pagination = {}) => {
     try {
-      const response = await apiClient.get(`/theatres/${theatreId}/screenings`);
+      const params = {
+        page: pagination.page || 0,
+        size: pagination.size || 10
+      };
+      const response = await apiClient.get(`/theatres/${theatreId}/screenings`, { params });
       
       // Normalize response data
       const responseData = response.data || {};
@@ -121,22 +200,25 @@ const screeningApi = {
   },
 
   /**
-   * Get screenings by date range
+   * Get screenings by date range with pagination
    * @param {Date|string} startDate - Start date
    * @param {Date|string} endDate - End date
-   * @returns {Promise<Array>} List of screenings
+   * @param {Object} [pagination] - Pagination options
+   * @returns {Promise<Object>} Paginated screenings
    */
-  getScreeningsByDateRange: async (startDate, endDate) => {
+  getScreeningsByDateRange: async (startDate, endDate, pagination = {}) => {
     try {
       const formattedStartDate = formatDateParam(startDate);
       const formattedEndDate = formatDateParam(endDate);
       
-      const response = await apiClient.get('/screenings', { 
-        params: { 
-          startDate: formattedStartDate,
-          endDate: formattedEndDate
-        } 
-      });
+      const params = {
+        startDate: formattedStartDate,
+        endDate: formattedEndDate,
+        page: pagination.page || 0,
+        size: pagination.size || 10
+      };
+      
+      const response = await apiClient.get('/screenings', { params });
       
       // Normalize response data
       const responseData = response.data || {};
@@ -153,17 +235,21 @@ const screeningApi = {
   },
 
   /**
-   * Get upcoming screenings
+   * Get upcoming screenings with pagination
+   * @param {Object} [pagination] - Pagination options
    * @param {number} [days=7] - Number of days to include
    * @returns {Promise<Object>} Upcoming screenings grouped by date
    */
-  getUpcomingScreenings: async (days = 7) => {
+  getUpcomingScreenings: async (pagination = {}, days = 7) => {
     try {
       // Try the primary endpoint
       try {
-        const response = await apiClient.get('/screenings/upcoming', {
-          params: { days }
-        });
+        const params = {
+          days,
+          page: pagination.page || 0,
+          size: pagination.size || 10
+        };
+        const response = await apiClient.get('/screenings/upcoming', { params });
         
         // Normalize response data
         const responseData = response.data || {};
@@ -177,12 +263,14 @@ const screeningApi = {
         const today = new Date();
         const formattedDate = today.toISOString().split('T')[0]; // YYYY-MM-DD
         
-        const response = await apiClient.get('/screenings', {
-          params: { 
-            startDate: formattedDate,
-            days
-          }
-        });
+        const params = {
+          startDate: formattedDate,
+          days,
+          page: pagination.page || 0,
+          size: pagination.size || 10
+        };
+        
+        const response = await apiClient.get('/screenings', { params });
         
         // Normalize response data
         const responseData = response.data || {};
@@ -381,6 +469,52 @@ const screeningApi = {
     } catch (error) {
       console.error('Error fetching screening formats:', error);
       return ['STANDARD', 'IMAX', '3D', 'DOLBY'];
+    }
+  },
+
+  /**
+   * Create a new screening (Admin only)
+   * @param {Object} screeningData - Screening data
+   * @returns {Promise<Object>} Created screening
+   */
+  createScreening: async (screeningData) => {
+    try {
+      const response = await apiClient.post('/admin/screenings', screeningData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating screening:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Update a screening (Admin only)
+   * @param {number|string} id - Screening ID
+   * @param {Object} screeningData - Updated screening data
+   * @returns {Promise<Object>} Updated screening
+   */
+  updateScreening: async (id, screeningData) => {
+    try {
+      const response = await apiClient.put(`/admin/screenings/${id}`, screeningData);
+      return response.data;
+    } catch (error) {
+      console.error(`Error updating screening ${id}:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * Delete a screening (Admin only)
+   * @param {number|string} id - Screening ID
+   * @returns {Promise<Object>} Response
+   */
+  deleteScreening: async (id) => {
+    try {
+      const response = await apiClient.delete(`/admin/screenings/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error deleting screening ${id}:`, error);
+      throw error;
     }
   }
 };

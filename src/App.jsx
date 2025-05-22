@@ -19,6 +19,8 @@ import RegisterPage from '@pages/auth/Register';
 import TwoFactorAuthPage from '@pages/auth/TwoFactorAuth'; // New 2FA page
 import ForgotPasswordPage from '@pages/auth/ForgotPassword'; // New forgot password page
 import ResetPasswordPage from '@pages/auth/ResetPassword'; // New reset password page
+import AboutPage from '@pages/public/About';
+import ContactPage from '@pages/public/Contact';
 import NotFoundPage from '@pages/public/NotFound';
 
 // User Pages
@@ -49,7 +51,7 @@ import {
 } from '@pages/admin/Theatres/index';
 
 // Admin Screenings Pages
-import AdminScreeningsPage from '@pages/admin/Screenings/Screenings';
+import ScreeningsPage from '@pages/admin/Screenings/Screenings';
 import AdminScreeningsCreatePage from '@pages/admin/Screenings/Create';
 import AdminScreeningsEditPage from '@pages/admin/Screenings/Edit';
 import AdminScreeningsViewPage from '@pages/admin/Screenings/View';
@@ -93,6 +95,8 @@ const router = createBrowserRouter([
       { path: 'two-factor-auth', element: <TwoFactorAuthPage /> }, // New 2FA route
       { path: 'forgot-password', element: <ForgotPasswordPage /> }, // New forgot password route
       { path: 'reset-password', element: <ResetPasswordPage /> }, // New reset password route
+      { path: 'about', element: <AboutPage /> },
+      { path: 'contact', element: <ContactPage /> },
       
       // Protected user routes
       { 
@@ -164,7 +168,7 @@ const router = createBrowserRouter([
       { path: 'theatres/:id/screens/:screenNumber/seats', element: <AdminTheatresManageSeatsPage /> },
       
       // Screening management routes
-      { path: 'screenings', element: <AdminScreeningsPage /> },
+      { path: 'screenings', element: <ScreeningsPage /> },
       { path: 'screenings/create', element: <AdminScreeningsCreatePage /> },
       { path: 'screenings/:id', element: <AdminScreeningsViewPage /> },
       { path: 'screenings/:id/edit', element: <AdminScreeningsEditPage /> },

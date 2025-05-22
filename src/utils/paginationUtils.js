@@ -1,245 +1,281 @@
-// src/utils/paginationUtils.js
-import { useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
-
+// src/utils/paginationUtils.js - Utility functions for pagination
 /**
- * Utility functions for pagination management
- */
-
-/**
- * Parse pagination parameters from URL search params
- * @param {URLSearchParams} searchParams - URL search parameters
- * @param {Object} defaults - Default values
- * @returns {Object} Parsed pagination parameters
- */
-export const parsePaginationParams = (searchParams, defaults = {}) => {
-  const defaultValues = {
-    page: 0,
-    size: 10,
-    sortBy: 'id',
-    sortOrder: 'asc',
-    ...defaults
-  };
-
-  return {
-    page: parseInt(searchParams.get('page')) || defaultValues.page,
-    size: parseInt(searchParams.get('size')) || defaultValues.size,
-    sortBy: searchParams.get('sortBy') || defaultValues.sortBy,
-    sortOrder: searchParams.get('sortOrder') || defaultValues.sortOrder,
-    search: searchParams.get('search') || '',
-    genre: searchParams.get('genre') || '',
-  };
-};
-
-/**
- * Create URL search params from pagination state
- * @param {Object} params - Pagination parameters
- * @param {Object} defaults - Default values to exclude from URL
- * @returns {URLSearchParams} URL search parameters
- */
-export const createPaginationParams = (params, defaults = {}) => {
-  const defaultValues = {
-    page: 0,
-    size: 10,
-    sortBy: 'id',
-    sortOrder: 'asc',
-    ...defaults
-  };
-
-  const searchParams = new URLSearchParams();
-
-  // Only add non-default values to URL
-  Object.entries(params).forEach(([key, value]) => {
-    if (value && value !== defaultValues[key] && value !== '') {
-      searchParams.set(key, value.toString());
-    }
-  });
-
-  return searchParams;
-};
-
-/**
- * Custom hook for managing pagination state with URL synchronization
- * @param {Object} defaultParams - Default pagination parameters
- * @param {Function} onParamsChange - Callback when parameters change
- * @returns {Object} Pagination state and handlers
- */
-export const usePaginationState = (defaultParams = {}, onParamsChange) => {
-  const [searchParams, setSearchParams] = useSearchParams();
-  
-  // Parse current params from URL
-  const currentParams = parsePaginationParams(searchParams, defaultParams);
-  
-  // Update URL when params change
-  const updateParams = useCallback((newParams) => {
-    const updatedParams = { ...currentParams, ...newParams };
-    const urlParams = createPaginationParams(updatedParams, defaultParams);
-    setSearchParams(urlParams);
-    
-    if (onParamsChange) {
-      onParamsChange(updatedParams);
-    }
-  }, [currentParams, defaultParams, setSearchParams, onParamsChange]);
-
-  // Individual parameter setters
-  const setPage = useCallback((page) => updateParams({ page }), [updateParams]);
-  const setSize = useCallback((size) => updateParams({ size, page: 0 }), [updateParams]);
-  const setSort = useCallback((sortBy, sortOrder) => updateParams({ sortBy, sortOrder, page: 0 }), [updateParams]);
-  const setSearch = useCallback((search) => updateParams({ search, page: 0 }), [updateParams]);
-  const setGenre = useCallback((genre) => updateParams({ genre, page: 0 }), [updateParams]);
-  
-  // Reset all filters
-  const resetFilters = useCallback(() => {
-    setSearchParams(new URLSearchParams());
-    if (onParamsChange) {
-      onParamsChange(defaultParams);
-    }
-  }, [setSearchParams, onParamsChange, defaultParams]);
-
-  return {
-    params: currentParams,
-    setPage,
-    setSize,
-    setSort,
-    setSearch,
-    setGenre,
-    resetFilters,
-    updateParams
-  };
-};
-
-/**
- * Calculate pagination info for display
- * @param {Object} paginationData - Pagination response data
- * @returns {Object} Calculated pagination info
- */
-export const calculatePaginationInfo = (paginationData) => {
-  if (!paginationData) {
-    return {
-      startItem: 0,
-      endItem: 0,
-      totalItems: 0,
-      currentPage: 0,
-      totalPages: 0,
-      hasNext: false,
-      hasPrevious: false
-    };
-  }
-
-  const {
-    currentPage = 0,
-    pageSize = 10,
-    totalElements = 0,
-    totalPages = 0,
-    hasNext = false,
-    hasPrevious = false
-  } = paginationData;
-
-  const startItem = totalElements > 0 ? currentPage * pageSize + 1 : 0;
-  const endItem = Math.min((currentPage + 1) * pageSize, totalElements);
-
-  return {
-    startItem,
-    endItem,
-    totalItems: totalElements,
-    currentPage,
-    totalPages,
-    hasNext,
-    hasPrevious
-  };
-};
-
-/**
- * Get visible page numbers for pagination display
- * @param {number} currentPage - Current page (0-based)
- * @param {number} totalPages - Total number of pages
- * @param {number} maxVisible - Maximum visible page numbers
- * @returns {Array<number>} Array of visible page numbers
- */
-export const getVisiblePages = (currentPage, totalPages, maxVisible = 5) => {
-  if (totalPages <= maxVisible) {
-    return Array.from({ length: totalPages }, (_, i) => i);
-  }
-
-  const halfVisible = Math.floor(maxVisible / 2);
-  let start = Math.max(0, currentPage - halfVisible);
-  let end = Math.min(totalPages - 1, start + maxVisible - 1);
-
-  // Adjust start if we're near the end
-  if (end - start < maxVisible - 1) {
-    start = Math.max(0, end - maxVisible + 1);
-  }
-
-  return Array.from({ length: end - start + 1 }, (_, i) => start + i);
-};
-
-/**
- * Debounce function for search inputs
+ * Debounce function to limit the rate of function calls
  * @param {Function} func - Function to debounce
  * @param {number} wait - Wait time in milliseconds
  * @returns {Function} Debounced function
  */
 export const debounce = (func, wait) => {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
       clearTimeout(timeout);
-      func(...args);
+      timeout = setTimeout(later, wait);
     };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
   };
-};
-
-/**
- * Validate pagination parameters
- * @param {Object} params - Pagination parameters
- * @returns {Object} Validated parameters
- */
-export const validatePaginationParams = (params) => {
-  const validated = { ...params };
-
-  // Ensure page is not negative
-  if (validated.page < 0) {
-    validated.page = 0;
-  }
-
-  // Ensure size is within reasonable bounds
-  if (validated.size < 1) {
-    validated.size = 10;
-  } else if (validated.size > 100) {
-    validated.size = 100;
-  }
-
-  // Validate sort order
-  if (!['asc', 'desc'].includes(validated.sortOrder)) {
-    validated.sortOrder = 'asc';
-  }
-
-  return validated;
-};
-
-/**
- * Create a pagination query key for React Query
- * @param {string} baseKey - Base query key
- * @param {Object} params - Pagination parameters
- * @returns {Array} Query key array
- */
-export const createPaginationQueryKey = (baseKey, params) => {
-  const cleanParams = Object.fromEntries(
-    Object.entries(params).filter(([_, value]) => value !== '' && value != null)
-  );
   
-  return [baseKey, cleanParams];
-};
-
-export default {
-  parsePaginationParams,
-  createPaginationParams,
-  usePaginationState,
-  calculatePaginationInfo,
-  getVisiblePages,
-  debounce,
-  validatePaginationParams,
-  createPaginationQueryKey
-};
+  /**
+   * Parse pagination parameters from URL search params
+   * @param {URLSearchParams} searchParams - URL search parameters
+   * @param {Object} defaultParams - Default parameter values
+   * @returns {Object} Parsed parameters
+   */
+  export const parsePaginationParams = (searchParams, defaultParams = {}) => {
+    const params = { ...defaultParams };
+    
+    // Parse each parameter with proper type conversion
+    Object.keys(defaultParams).forEach(key => {
+      const value = searchParams.get(key);
+      if (value !== null) {
+        // Type conversion based on default value type
+        const defaultValue = defaultParams[key];
+        if (typeof defaultValue === 'number') {
+          const parsedValue = parseInt(value, 10);
+          if (!isNaN(parsedValue)) {
+            params[key] = parsedValue;
+          }
+        } else if (typeof defaultValue === 'boolean') {
+          params[key] = value === 'true';
+        } else {
+          params[key] = value;
+        }
+      }
+    });
+    
+    return params;
+  };
+  
+  /**
+   * Create URL search params from pagination parameters
+   * @param {Object} params - Current parameters
+   * @param {Object} defaultParams - Default parameter values
+   * @returns {URLSearchParams} URL search parameters
+   */
+  export const createPaginationParams = (params, defaultParams = {}) => {
+    const urlParams = new URLSearchParams();
+    
+    Object.keys(params).forEach(key => {
+      const value = params[key];
+      const defaultValue = defaultParams[key];
+      
+      // Only add to URL if different from default
+      if (value !== defaultValue && value !== '' && value !== null && value !== undefined) {
+        urlParams.set(key, value.toString());
+      }
+    });
+    
+    return urlParams;
+  };
+  
+  /**
+   * Generate sort icon class based on current sort state
+   * @param {string} field - Field name
+   * @param {string} currentSortBy - Current sort field
+   * @param {string} currentSortOrder - Current sort order
+   * @returns {string} CSS class for sort icon
+   */
+  export const getSortIconClass = (field, currentSortBy, currentSortOrder) => {
+    if (currentSortBy !== field) return 'h-4 w-4 text-gray-400';
+    
+    const baseClass = 'h-4 w-4 transition-transform';
+    return currentSortOrder === 'desc' 
+      ? `${baseClass} transform rotate-180` 
+      : baseClass;
+  };
+  
+  /**
+   * Calculate pagination info text
+   * @param {number} currentPage - Current page (0-based)
+   * @param {number} pageSize - Page size
+   * @param {number} totalElements - Total number of elements
+   * @returns {Object} Pagination info
+   */
+  export const getPaginationInfo = (currentPage, pageSize, totalElements) => {
+    const startElement = Math.min(currentPage * pageSize + 1, totalElements);
+    const endElement = Math.min((currentPage + 1) * pageSize, totalElements);
+    
+    return {
+      startElement,
+      endElement,
+      totalElements,
+      hasElements: totalElements > 0
+    };
+  };
+  
+  /**
+   * Validate and normalize page number
+   * @param {number} page - Page number
+   * @param {number} totalPages - Total pages
+   * @returns {number} Valid page number
+   */
+  export const normalizePage = (page, totalPages) => {
+    if (isNaN(page) || page < 0) return 0;
+    if (page >= totalPages && totalPages > 0) return totalPages - 1;
+    return page;
+  };
+  
+  /**
+   * Validate and normalize page size
+   * @param {number} size - Page size
+   * @param {number} minSize - Minimum page size (default: 1)
+   * @param {number} maxSize - Maximum page size (default: 100)
+   * @returns {number} Valid page size
+   */
+  export const normalizePageSize = (size, minSize = 1, maxSize = 100) => {
+    if (isNaN(size) || size < minSize) return minSize;
+    if (size > maxSize) return maxSize;
+    return size;
+  };
+  
+  /**
+   * Create filter display text
+   * @param {Object} filters - Current filters
+   * @returns {string} Human-readable filter description
+   */
+  export const getFilterDisplayText = (filters) => {
+    const activeFilters = [];
+    
+    if (filters.search) {
+      activeFilters.push(`Search: "${filters.search}"`);
+    }
+    
+    if (filters.genre) {
+      activeFilters.push(`Genre: ${formatEnumValue(filters.genre)}`);
+    }
+    
+    if (filters.movieId) {
+      activeFilters.push(`Movie ID: ${filters.movieId}`);
+    }
+    
+    if (filters.theatreId) {
+      activeFilters.push(`Theatre ID: ${filters.theatreId}`);
+    }
+    
+    if (filters.date) {
+      activeFilters.push(`Date: ${filters.date}`);
+    }
+    
+    return activeFilters.length > 0 
+      ? `Filtered by: ${activeFilters.join(', ')}`
+      : 'No filters applied';
+  };
+  
+  /**
+   * Format enum values for display
+   * @param {string} value - Enum value
+   * @returns {string} Formatted display value
+   */
+  export const formatEnumValue = (value) => {
+    if (!value) return '';
+    
+    return value
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  };
+  
+  /**
+   * Check if any filters are active
+   * @param {Object} params - Current parameters
+   * @param {Object} defaultParams - Default parameters
+   * @returns {boolean} True if any filters are active
+   */
+  export const hasActiveFilters = (params, defaultParams) => {
+    return Object.keys(params).some(key => {
+      if (key === 'page' || key === 'size') return false; // Ignore pagination params
+      return params[key] !== defaultParams[key] && params[key] !== '' && params[key] !== null;
+    });
+  };
+  
+  /**
+   * Reset filters to default values
+   * @param {Object} defaultParams - Default parameters
+   * @returns {Object} Reset parameters
+   */
+  export const resetFilters = (defaultParams) => {
+    return { ...defaultParams, page: 0 }; // Reset to first page
+  };
+  
+  /**
+   * Generate page numbers for pagination display
+   * @param {number} currentPage - Current page (0-based)
+   * @param {number} totalPages - Total pages
+   * @param {number} maxVisible - Maximum visible page numbers
+   * @returns {Array<number>} Array of page numbers to display
+   */
+  export const getVisiblePages = (currentPage, totalPages, maxVisible = 5) => {
+    const pages = [];
+    const halfVisible = Math.floor(maxVisible / 2);
+    let startPage = Math.max(0, currentPage - halfVisible);
+    let endPage = Math.min(totalPages - 1, startPage + maxVisible - 1);
+  
+    // Adjust start page if we're near the end
+    if (endPage - startPage < maxVisible - 1) {
+      startPage = Math.max(0, endPage - maxVisible + 1);
+    }
+  
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+  
+    return pages;
+  };
+  
+  /**
+   * Check if a value is a valid sort field
+   * @param {string} sortBy - Sort field
+   * @param {Array<string>} allowedFields - Allowed sort fields
+   * @returns {boolean} True if valid
+   */
+  export const isValidSortField = (sortBy, allowedFields) => {
+    return allowedFields.includes(sortBy);
+  };
+  
+  /**
+   * Check if a value is a valid sort order
+   * @param {string} sortOrder - Sort order
+   * @returns {boolean} True if valid
+   */
+  export const isValidSortOrder = (sortOrder) => {
+    return ['asc', 'desc'].includes(sortOrder);
+  };
+  
+  /**
+   * Build query parameters for API calls
+   * @param {Object} params - Current parameters
+   * @param {Object} options - Options for building params
+   * @param {Array<string>} options.excludeEmpty - Keys to exclude if empty
+   * @param {Array<string>} options.excludeDefault - Keys to exclude if default value
+   * @param {Object} options.defaultValues - Default values for comparison
+   * @returns {Object} Clean query parameters
+   */
+  export const buildQueryParams = (params, options = {}) => {
+    const {
+      excludeEmpty = ['search', 'genre', 'movieId', 'theatreId', 'date'],
+      excludeDefault = [],
+      defaultValues = {}
+    } = options;
+    
+    const queryParams = {};
+    
+    Object.keys(params).forEach(key => {
+      const value = params[key];
+      
+      // Skip if should exclude empty values
+      if (excludeEmpty.includes(key) && (!value || value === '')) {
+        return;
+      }
+      
+      // Skip if should exclude default values
+      if (excludeDefault.includes(key) && value === defaultValues[key]) {
+        return;
+      }
+      
+      queryParams[key] = value;
+    });
+    
+    return queryParams;
+  };

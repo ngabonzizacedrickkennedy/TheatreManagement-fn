@@ -1,13 +1,15 @@
-// src/pages/admin/Screenings/Screenings.jsx
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+// src/pages/admin/Screenings/Screenings.jsx - Complete pagination implementation
+import { useState, useEffect, useCallback } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useScreenings } from '@hooks/useScreenings';
 import { useMovies } from '@hooks/useMovies';
-import { useGetTheatres } from '@hooks/useTheatres';  // Import theatres hook directly
+import { useGetTheatres } from '@hooks/useTheatres';
 import { useToast } from '@contexts/ToastContext';
 import { formatDate, formatEnumValue, formatCurrency } from '@utils/formatUtils';
+import { debounce, parsePaginationParams, createPaginationParams } from '@utils/paginationUtils';
 import Button from '@components/common/Button';
 import LoadingSpinner from '@components/common/LoadingSpinner';
+import Pagination from '@components/common/Pagination';
 import {
   PlusIcon,
   MagnifyingGlassIcon,
@@ -23,78 +25,104 @@ import {
 
 const ScreeningsPage = () => {
   const { showSuccess, showError } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   
-  // State for search, filters, and sorting
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedMovieId, setSelectedMovieId] = useState('');
-  const [selectedTheatreId, setSelectedTheatreId] = useState('');
-  const [selectedDate, setSelectedDate] = useState('');
-  const [sortBy, setSortBy] = useState('startTime');
-  const [sortOrder, setSortOrder] = useState('asc');
+  // Default pagination parameters
+  const defaultParams = {
+    page: 0,
+    size: 5,
+    sortBy: 'startTime',
+    sortOrder: 'asc',
+    search: '',
+    movieId: '',
+    theatreId: '',
+    date: ''
+  };
   
-  // Get all theatres for filter dropdown
-  const { data: theatresData = [], isLoading: isLoadingTheatres } = useGetTheatres();
-  const theatres = Array.isArray(theatresData) ? theatresData : [];
+  // Parse parameters from URL and maintain them in state
+  const [params, setParams] = useState(() => parsePaginationParams(searchParams, defaultParams));
+  const [searchInput, setSearchInput] = useState(params.search);
+  const [isUpdatingUrl, setIsUpdatingUrl] = useState(false);
   
-  // Get screenings with optional filters
-  const { useGetScreenings, useGetScreeningFormats, useDeleteScreening } = useScreenings();
-  const { 
-    data: screeningsData = [], 
-    isLoading: isLoadingScreenings,
-    refetch: refetchScreenings
-  } = useGetScreenings({
-    movieId: selectedMovieId || undefined,
-    theatreId: selectedTheatreId || undefined,
-    date: selectedDate || undefined
-  });
+  // Debounced search function
+  const debouncedSearch = useCallback(
+    debounce((searchValue) => {
+      updateParams({ search: searchValue, page: 0 });
+    }, 500),
+    []
+  );
   
-  // Ensure screenings is always an array by checking data structure
-  const [screenings, setScreenings] = useState([]);
+  // Update URL when params change (but avoid loops)
+  const updateParams = useCallback((newParams) => {
+    const updatedParams = { ...params, ...newParams };
+    setParams(updatedParams);
+    setIsUpdatingUrl(true);
+    
+    const urlParams = createPaginationParams(updatedParams, defaultParams);
+    setSearchParams(urlParams, { replace: true });
+    
+    // Reset the flag after a short delay
+    setTimeout(() => setIsUpdatingUrl(false), 100);
+  }, [params, setSearchParams]);
   
-  // Process screenings data when it changes
+  // Handle search input change
   useEffect(() => {
-    if (screeningsData) {
-      // Handle different possible response formats
-      if (Array.isArray(screeningsData)) {
-        setScreenings(screeningsData);
-      } else if (screeningsData && typeof screeningsData === 'object') {
-        // If it's an object, check for a screenings property
-        if (Array.isArray(screeningsData.screenings)) {
-          setScreenings(screeningsData.screenings);
-        } else {
-          // If no screenings property, try to convert object to array of values
-          const extractedScreenings = Object.values(screeningsData).filter(item => item && typeof item === 'object');
-          setScreenings(extractedScreenings);
-        }
-      } else {
-        // Fallback to empty array
-        setScreenings([]);
-      }
-    } else {
-      setScreenings([]);
+    if (searchInput !== params.search) {
+      debouncedSearch(searchInput);
     }
-  }, [screeningsData]);
+  }, [searchInput, debouncedSearch, params.search]);
   
-  // Get screening formats
-  const {
-    data: formatsData = [],
-    isLoading: isLoadingFormats
-  } = useGetScreeningFormats();
-  const formats = Array.isArray(formatsData) ? formatsData : [];
+  // Sync URL params with state only when URL actually changes (not from our updates)
+  useEffect(() => {
+    if (!isUpdatingUrl) {
+      const urlParams = parsePaginationParams(searchParams, defaultParams);
+      const hasChanged = JSON.stringify(urlParams) !== JSON.stringify(params);
+      
+      if (hasChanged) {
+        setParams(urlParams);
+        setSearchInput(urlParams.search);
+      }
+    }
+  }, [searchParams, isUpdatingUrl, params]);
   
-  // Get all movies for filter dropdown
+  // API calls
+  const { useGetAdminScreenings, useDeleteScreening } = useScreenings();
   const { useGetMovies } = useMovies();
+  const { data: theatresData = [], isLoading: isLoadingTheatres } = useGetTheatres();
+  
+  // Build query params for API
+  const queryParams = {
+    ...params,
+    movieId: params.movieId || undefined,
+    theatreId: params.theatreId || undefined,
+    date: params.date || undefined,
+    search: params.search || undefined
+  };
+  
   const {
-    data: moviesData = [],
-    isLoading: isLoadingMovies
-  } = useGetMovies();
-  const movies = Array.isArray(moviesData) ? moviesData : [];
+    data: response,
+    isLoading: isLoadingScreenings,
+    isFetching,
+    error,
+    refetch: refetchScreenings
+  } = useGetAdminScreenings(queryParams);
+  
+  // Get movies for filter dropdown
+  const { data: moviesData = [], isLoading: isLoadingMovies } = useGetMovies();
+  
+  // Extract data
+  const screenings = response?.screenings || [];
+  const pagination = {
+    currentPage: response?.currentPage || 0,
+    totalPages: response?.totalPages || 0,
+    totalElements: response?.totalElements || 0,
+    pageSize: response?.pageSize || 10,
+    hasNext: response?.hasNext || false,
+    hasPrevious: response?.hasPrevious || false
+  };
   
   // Delete screening mutation
-  const {
-    mutate: deleteScreening,
-    isPending: isDeleting
-  } = useDeleteScreening({
+  const { mutate: deleteScreening, isPending: isDeleting } = useDeleteScreening({
     onSuccess: () => {
       showSuccess('Screening deleted successfully');
       refetchScreenings();
@@ -104,115 +132,75 @@ const ScreeningsPage = () => {
     }
   });
   
-  // Handle screening deletion
-  const handleDeleteScreening = (id) => {
+  // Event handlers
+  const handleSort = useCallback((field) => {
+    const newOrder = params.sortBy === field && params.sortOrder === 'asc' ? 'desc' : 'asc';
+    updateParams({ sortBy: field, sortOrder: newOrder, page: 0 });
+  }, [params.sortBy, params.sortOrder, updateParams]);
+  
+  const handlePageChange = useCallback((page) => {
+    updateParams({ page });
+  }, [updateParams]);
+  
+  const handlePageSizeChange = useCallback((size) => {
+    updateParams({ size, page: 0 });
+  }, [updateParams]);
+  
+  const handleMovieChange = useCallback((e) => {
+    updateParams({ movieId: e.target.value, page: 0 });
+  }, [updateParams]);
+  
+  const handleTheatreChange = useCallback((e) => {
+    updateParams({ theatreId: e.target.value, page: 0 });
+  }, [updateParams]);
+  
+  const handleDateChange = useCallback((e) => {
+    updateParams({ date: e.target.value, page: 0 });
+  }, [updateParams]);
+  
+  const handleResetFilters = useCallback(() => {
+    setSearchInput('');
+    setParams(defaultParams);
+    setSearchParams(new URLSearchParams(), { replace: true });
+  }, [setSearchParams]);
+  
+  const handleDeleteScreening = useCallback((id) => {
     if (window.confirm('Are you sure you want to delete this screening?')) {
       deleteScreening(id);
     }
-  };
+  }, [deleteScreening]);
   
-  // Handle search input change
-  const handleSearchChange = (e) => {
-    setSearchQuery(e.target.value);
+  // Render sort icon
+  const renderSortIcon = (field) => {
+    if (params.sortBy !== field) return null;
+    return (
+      <ArrowsUpDownIcon 
+        className={`h-4 w-4 transition-transform ${
+          params.sortOrder === 'desc' ? 'transform rotate-180' : ''
+        }`} 
+      />
+    );
   };
-  
-  // Handle movie filter change
-  const handleMovieChange = (e) => {
-    setSelectedMovieId(e.target.value);
-  };
-  
-  // Handle theatre filter change
-  const handleTheatreChange = (e) => {
-    setSelectedTheatreId(e.target.value);
-  };
-  
-  // Handle date filter change
-  const handleDateChange = (e) => {
-    setSelectedDate(e.target.value);
-  };
-  
-  // Handle sort change
-  const handleSortChange = (field) => {
-    if (sortBy === field) {
-      // Toggle sort order if same field
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      // Set new field and default to ascending
-      setSortBy(field);
-      setSortOrder('asc');
-    }
-  };
-  
-  // Reset all filters
-  const resetFilters = () => {
-    setSearchQuery('');
-    setSelectedMovieId('');
-    setSelectedTheatreId('');
-    setSelectedDate('');
-  };
-  
-  // Filter and sort screenings safely
-  const filteredScreenings = screenings
-    .filter(screening => {
-      if (!screening) return false;
-      
-      // Safely access properties that might not exist
-      const movieTitle = screening.movieTitle || '';
-      const theatreName = screening.theatreName || '';
-      
-      // Search filter for movie title or theatre name
-      return searchQuery === '' || 
-        movieTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        theatreName.toLowerCase().includes(searchQuery.toLowerCase());
-    })
-    .sort((a, b) => {
-      // Handle null/undefined values safely
-      if (!a || !b) return 0;
-      
-      // Sort by selected field
-      let comparison = 0;
-      
-      switch (sortBy) {
-        case 'movieTitle':
-          comparison = (a.movieTitle || '').localeCompare(b.movieTitle || '');
-          break;
-        case 'theatreName':
-          comparison = (a.theatreName || '').localeCompare(b.theatreName || '');
-          break;
-        case 'startTime':
-          const aTime = a.startTime ? new Date(a.startTime) : new Date(0);
-          const bTime = b.startTime ? new Date(b.startTime) : new Date(0);
-          comparison = aTime - bTime;
-          break;
-        case 'format':
-          comparison = (a.format || '').localeCompare(b.format || '');
-          break;
-        case 'basePrice':
-          const aPrice = a.basePrice || 0;
-          const bPrice = b.basePrice || 0;
-          comparison = aPrice - bPrice;
-          break;
-        default:
-          const aDefaultTime = a.startTime ? new Date(a.startTime) : new Date(0);
-          const bDefaultTime = b.startTime ? new Date(b.startTime) : new Date(0);
-          comparison = aDefaultTime - bDefaultTime;
-      }
-      
-      // Apply sort order
-      return sortOrder === 'asc' ? comparison : -comparison;
-    });
   
   // Format current date as YYYY-MM-DD for date input default
   const today = new Date().toISOString().split('T')[0];
   
   // Loading state
-  if (isLoadingScreenings || isLoadingFormats || isLoadingMovies || isLoadingTheatres) {
+  if (isLoadingScreenings && !isFetching) {
     return <LoadingSpinner />;
   }
   
-  // Debug info - this would be removed in production but helps diagnose issues
-  console.log('Screenings data structure:', screeningsData);
-  console.log('Processed screenings:', screenings);
+  // Error state
+  if (error) {
+    return (
+      <div className="text-center py-8">
+        <ExclamationCircleIcon className="h-12 w-12 text-red-500 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Screenings</h3>
+        <p className="text-gray-500 mb-4">{error.message}</p>
+        <Button onClick={() => refetchScreenings()}>Retry</Button>
+      </div>
+    );
+  }
   
   return (
     <div>
@@ -231,7 +219,7 @@ const ScreeningsPage = () => {
       {/* Filters and search */}
       <div className="bg-white rounded-lg shadow mb-6">
         <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
             {/* Search */}
             <div>
               <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">
@@ -246,8 +234,8 @@ const ScreeningsPage = () => {
                   type="text"
                   placeholder="Search screenings..."
                   className="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                  value={searchQuery}
-                  onChange={handleSearchChange}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
                 />
               </div>
             </div>
@@ -264,11 +252,12 @@ const ScreeningsPage = () => {
                 <select
                   id="movie"
                   className="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                  value={selectedMovieId}
+                  value={params.movieId}
                   onChange={handleMovieChange}
+                  disabled={isLoadingMovies}
                 >
                   <option value="">All Movies</option>
-                  {movies.map(movie => (
+                  {moviesData.map(movie => (
                     <option key={movie.id} value={movie.id}>
                       {movie.title}
                     </option>
@@ -289,11 +278,12 @@ const ScreeningsPage = () => {
                 <select
                   id="theatre"
                   className="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                  value={selectedTheatreId}
+                  value={params.theatreId}
                   onChange={handleTheatreChange}
+                  disabled={isLoadingTheatres}
                 >
                   <option value="">All Theatres</option>
-                  {theatres.map(theatre => (
+                  {theatresData.map(theatre => (
                     <option key={theatre.id} value={theatre.id}>
                       {theatre.name}
                     </option>
@@ -315,7 +305,7 @@ const ScreeningsPage = () => {
                   id="date"
                   type="date"
                   className="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                  value={selectedDate}
+                  value={params.date}
                   onChange={handleDateChange}
                   min={today}
                 />
@@ -328,8 +318,8 @@ const ScreeningsPage = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={resetFilters}
-              disabled={!searchQuery && !selectedMovieId && !selectedTheatreId && !selectedDate}
+              onClick={handleResetFilters}
+              disabled={!params.search && !params.movieId && !params.theatreId && !params.date && params.sortBy === 'startTime' && params.sortOrder === 'asc'}
             >
               Reset Filters
             </Button>
@@ -337,147 +327,160 @@ const ScreeningsPage = () => {
         </div>
       </div>
       
-      {/* Screenings list */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        {filteredScreenings.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  {/* Table headers with sort functionality */}
-                  <th 
-                    scope="col" 
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                    onClick={() => handleSortChange('movieTitle')}
-                  >
-                    <div className="flex items-center space-x-1">
-                      <span>Movie</span>
-                      {sortBy === 'movieTitle' && (
-                        <ArrowsUpDownIcon className={`h-4 w-4 ${sortOrder === 'asc' ? 'transform rotate-180' : ''}`} />
-                      )}
-                    </div>
-                  </th>
-                  <th 
-                    scope="col" 
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                    onClick={() => handleSortChange('theatreName')}
-                  >
-                    <div className="flex items-center space-x-1">
-                      <span>Theatre</span>
-                      {sortBy === 'theatreName' && (
-                        <ArrowsUpDownIcon className={`h-4 w-4 ${sortOrder === 'asc' ? 'transform rotate-180' : ''}`} />
-                      )}
-                    </div>
-                  </th>
-                  <th 
-                    scope="col" 
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                    onClick={() => handleSortChange('startTime')}
-                  >
-                    <div className="flex items-center space-x-1">
-                      <span>Date & Time</span>
-                      {sortBy === 'startTime' && (
-                        <ArrowsUpDownIcon className={`h-4 w-4 ${sortOrder === 'asc' ? 'transform rotate-180' : ''}`} />
-                      )}
-                    </div>
-                  </th>
-                  <th 
-                    scope="col" 
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                  >
-                    Screen
-                  </th>
-                  <th 
-                    scope="col" 
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                    onClick={() => handleSortChange('format')}
-                  >
-                    <div className="flex items-center space-x-1">
-                      <span>Format</span>
-                      {sortBy === 'format' && (
-                        <ArrowsUpDownIcon className={`h-4 w-4 ${sortOrder === 'asc' ? 'transform rotate-180' : ''}`} />
-                      )}
-                    </div>
-                  </th>
-                  <th 
-                    scope="col" 
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                    onClick={() => handleSortChange('basePrice')}
-                  >
-                    <div className="flex items-center space-x-1">
-                      <span>Base Price</span>
-                      {sortBy === 'basePrice' && (
-                        <ArrowsUpDownIcon className={`h-4 w-4 ${sortOrder === 'asc' ? 'transform rotate-180' : ''}`} />
-                      )}
-                    </div>
-                  </th>
-                  <th 
-                    scope="col" 
-                    className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                  >
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredScreenings.map(screening => (
-                  <tr key={screening.id}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {screening.movieTitle || 'Unknown Movie'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{screening.theatreName || 'Unknown Theatre'}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {screening.startTime ? formatDate(screening.startTime) : 'No date'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {screening.screenNumber || 'N/A'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                        {screening.format ? formatEnumValue(screening.format) : 'Standard'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      ${(screening.basePrice || 0).toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end space-x-2">
-                        <Link to={`/admin/screenings/${screening.id}/bookings`}>
-                          <Button variant="ghost" size="sm">
-                            Bookings
-                          </Button>
-                        </Link>
-                        <Link to={`/admin/screenings/${screening.id}/edit`}>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            icon={<PencilSquareIcon className="h-4 w-4" />}
-                          >
-                            Edit
-                          </Button>
-                        </Link>
-                        <Button 
-                          variant="danger" 
-                          size="sm"
-                          icon={<TrashIcon className="h-4 w-4" />}
-                          onClick={() => handleDeleteScreening(screening.id)}
-                          loading={isDeleting}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* Screenings table with loading overlay */}
+      <div className="bg-white rounded-lg shadow overflow-hidden relative">
+        {/* Loading overlay */}
+        {isFetching && (
+          <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
+            <LoadingSpinner size="md" />
           </div>
+        )}
+        
+        {screenings.length > 0 ? (
+          <>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    {/* Table headers with sort functionality */}
+                    <th 
+                      scope="col" 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleSort('movieTitle')}
+                    >
+                      <div className="flex items-center space-x-1">
+                        <span>Movie</span>
+                        {renderSortIcon('movieTitle')}
+                      </div>
+                    </th>
+                    <th 
+                      scope="col" 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleSort('theatreName')}
+                    >
+                      <div className="flex items-center space-x-1">
+                        <span>Theatre</span>
+                        {renderSortIcon('theatreName')}
+                      </div>
+                    </th>
+                    <th 
+                      scope="col" 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleSort('startTime')}
+                    >
+                      <div className="flex items-center space-x-1">
+                        <span>Date & Time</span>
+                        {renderSortIcon('startTime')}
+                      </div>
+                    </th>
+                    <th 
+                      scope="col" 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Screen
+                    </th>
+                    <th 
+                      scope="col" 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleSort('format')}
+                    >
+                      <div className="flex items-center space-x-1">
+                        <span>Format</span>
+                        {renderSortIcon('format')}
+                      </div>
+                    </th>
+                    <th 
+                      scope="col" 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleSort('basePrice')}
+                    >
+                      <div className="flex items-center space-x-1">
+                        <span>Base Price</span>
+                        {renderSortIcon('basePrice')}
+                      </div>
+                    </th>
+                    <th 
+                      scope="col" 
+                      className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {screenings.map(screening => (
+                    <tr key={screening.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {screening.movieTitle || 'Unknown Movie'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{screening.theatreName || 'Unknown Theatre'}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {screening.startTime ? formatDate(screening.startTime) : 'No date'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {screening.screenNumber || 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                          {screening.format ? formatEnumValue(screening.format) : 'Standard'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {formatCurrency(screening.basePrice || 0)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex justify-end space-x-2">
+                          <Link to={`/admin/screenings/${screening.id}/bookings`}>
+                            <Button variant="ghost" size="sm">
+                              Bookings
+                            </Button>
+                          </Link>
+                          <Link to={`/admin/screenings/${screening.id}/edit`}>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              icon={<PencilSquareIcon className="h-4 w-4" />}
+                            >
+                              Edit
+                            </Button>
+                          </Link>
+                          <Button 
+                            variant="danger" 
+                            size="sm"
+                            icon={<TrashIcon className="h-4 w-4" />}
+                            onClick={() => handleDeleteScreening(screening.id)}
+                            loading={isDeleting}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Pagination */}
+            <div className="px-6 py-4 border-t border-gray-200">
+              <Pagination
+                currentPage={pagination.currentPage}
+                totalPages={pagination.totalPages}
+                totalElements={pagination.totalElements}
+                pageSize={pagination.pageSize}
+                onPageChange={handlePageChange}
+                onPageSizeChange={handlePageSizeChange}
+                showPageSizeSelector={true}
+                showPageInfo={true}
+              />
+            </div>
+          </>
         ) : (
           <div className="p-12 text-center">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
@@ -485,7 +488,7 @@ const ScreeningsPage = () => {
             </div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">No screenings found</h3>
             <p className="text-gray-500 mb-6">
-              {searchQuery || selectedMovieId || selectedTheatreId || selectedDate
+              {params.search || params.movieId || params.theatreId || params.date
                 ? 'No screenings match your filters. Try adjusting your search criteria.'
                 : 'There are no screenings in the system yet. Add your first screening to get started.'
               }

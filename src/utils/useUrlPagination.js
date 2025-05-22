@@ -1,115 +1,128 @@
-// src/hooks/useUrlPagination.js
-import { useState, useEffect, useCallback, useRef } from 'react';
+// src/hooks/useUrlPagination.js - Custom hook for URL-based pagination
+import { useState, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { parsePaginationParams, createPaginationParams } from '@utils/paginationUtils';
 
 /**
  * Custom hook for managing pagination state synchronized with URL
- * Prevents infinite loops and provides stable state management
+ * @param {Object} defaultParams - Default pagination parameters
+ * @returns {Object} Pagination state and handlers
  */
 export const useUrlPagination = (defaultParams = {}) => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const isInitialMount = useRef(true);
-  const isUpdatingFromComponent = useRef(false);
+  const [isUpdatingUrl, setIsUpdatingUrl] = useState(false);
   
-  // Default values
-  const defaults = {
-    page: 0,
-    size: 10,
-    sortBy: 'title',
-    sortOrder: 'asc',
-    search: '',
-    genre: '',
-    ...defaultParams
-  };
+  // Parse initial parameters from URL
+  const [params, setParams] = useState(() => 
+    parsePaginationParams(searchParams, defaultParams)
+  );
   
-  // Initialize state from URL
-  const [params, setParams] = useState(() => {
-    return parsePaginationParams(searchParams, defaults);
-  });
+  // Search input state (separate from params to handle debouncing)
+  const [searchInput, setSearchInput] = useState(params.search || '');
   
-  // Separate state for search input to handle debouncing
-  const [searchInput, setSearchInput] = useState(params.search);
+  // Update URL when params change (avoid infinite loops)
+  const updateUrl = useCallback((newParams) => {
+    setIsUpdatingUrl(true);
+    const urlParams = createPaginationParams(newParams, defaultParams);
+    setSearchParams(urlParams, { replace: true });
+    setTimeout(() => setIsUpdatingUrl(false), 100);
+  }, [defaultParams, setSearchParams]);
   
   // Update params and URL
   const updateParams = useCallback((newParams) => {
     const updatedParams = { ...params, ...newParams };
-    
-    // Prevent loops by marking that this update comes from component
-    isUpdatingFromComponent.current = true;
-    
     setParams(updatedParams);
-    
-    // Update URL
-    const urlParams = createPaginationParams(updatedParams, defaults);
-    setSearchParams(urlParams, { replace: true });
-    
-    // Reset flag after URL update
-    setTimeout(() => {
-      isUpdatingFromComponent.current = false;
-    }, 50);
-  }, [params, setSearchParams, defaults]);
+    updateUrl(updatedParams);
+  }, [params, updateUrl]);
   
-  // Sync URL changes to state (only when URL changes externally)
+  // Sync URL params with state when URL changes externally
   useEffect(() => {
-    // Skip on initial mount and when update comes from component
-    if (isInitialMount.current || isUpdatingFromComponent.current) {
-      isInitialMount.current = false;
-      return;
+    if (!isUpdatingUrl) {
+      const urlParams = parsePaginationParams(searchParams, defaultParams);
+      const hasChanged = JSON.stringify(urlParams) !== JSON.stringify(params);
+      
+      if (hasChanged) {
+        setParams(urlParams);
+        setSearchInput(urlParams.search || '');
+      }
     }
-    
-    const urlParams = parsePaginationParams(searchParams, defaults);
-    
-    // Only update if params actually changed
-    const hasChanged = Object.keys(urlParams).some(key => urlParams[key] !== params[key]);
-    
-    if (hasChanged) {
-      setParams(urlParams);
-      setSearchInput(urlParams.search);
-    }
-  }, [searchParams, params, defaults]);
+  }, [searchParams, isUpdatingUrl, params, defaultParams]);
   
-  // Individual update functions
+  // Individual parameter setters
   const setPage = useCallback((page) => {
     updateParams({ page });
   }, [updateParams]);
   
   const setPageSize = useCallback((size) => {
-    updateParams({ size, page: 0 });
+    updateParams({ size, page: 0 }); // Reset to first page when changing size
   }, [updateParams]);
   
-  const setSort = useCallback((sortBy, sortOrder) => {
-    updateParams({ sortBy, sortOrder, page: 0 });
+  const setSort = useCallback((sortBy, sortOrder = 'asc') => {
+    updateParams({ sortBy, sortOrder, page: 0 }); // Reset to first page when sorting
   }, [updateParams]);
   
   const setSearch = useCallback((search) => {
-    updateParams({ search, page: 0 });
+    updateParams({ search, page: 0 }); // Reset to first page when searching
   }, [updateParams]);
   
   const setGenre = useCallback((genre) => {
-    updateParams({ genre, page: 0 });
+    updateParams({ genre, page: 0 }); // Reset to first page when filtering
   }, [updateParams]);
   
+  const setMovieId = useCallback((movieId) => {
+    updateParams({ movieId, page: 0 }); // Reset to first page when filtering
+  }, [updateParams]);
+  
+  const setTheatreId = useCallback((theatreId) => {
+    updateParams({ theatreId, page: 0 }); // Reset to first page when filtering
+  }, [updateParams]);
+  
+  const setDate = useCallback((date) => {
+    updateParams({ date, page: 0 }); // Reset to first page when filtering
+  }, [updateParams]);
+  
+  // Reset all filters to default
   const resetFilters = useCallback(() => {
-    isUpdatingFromComponent.current = true;
-    setParams(defaults);
-    setSearchInput(defaults.search);
+    setParams(defaultParams);
+    setSearchInput('');
     setSearchParams(new URLSearchParams(), { replace: true });
-    setTimeout(() => {
-      isUpdatingFromComponent.current = false;
-    }, 50);
-  }, [defaults, setSearchParams]);
+  }, [defaultParams, setSearchParams]);
+  
+  // Check if any filters are active
+  const hasActiveFilters = useCallback(() => {
+    return Object.keys(params).some(key => {
+      if (key === 'page' || key === 'size') return false; // Ignore pagination params
+      return params[key] !== defaultParams[key] && 
+             params[key] !== '' && 
+             params[key] !== null && 
+             params[key] !== undefined;
+    });
+  }, [params, defaultParams]);
   
   return {
+    // Current parameters
     params,
+    
+    // Search input state (for controlled input)
     searchInput,
     setSearchInput,
+    
+    // Individual setters
     setPage,
     setPageSize,
     setSort,
     setSearch,
     setGenre,
+    setMovieId,
+    setTheatreId,
+    setDate,
+    
+    // Utility functions
+    updateParams,
     resetFilters,
-    updateParams
+    hasActiveFilters,
+    
+    // URL state
+    isUpdatingUrl
   };
 };
