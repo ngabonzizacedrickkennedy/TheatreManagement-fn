@@ -29,6 +29,33 @@ export const useBookings = () => {
       ...options
     });
   };
+  
+  /**
+   * Get all bookings (Admin only)
+   */
+  const useGetAllBookings = (options = {}) => {
+    return useQuery({
+      queryKey: ['admin-bookings'],
+      queryFn: async () => {
+        try {
+          // Try the admin endpoint first
+          try {
+            const data = await bookingApi.getAllBookings();
+            return Array.isArray(data) ? data : [];
+          } catch (error) {
+            // Fallback to getUserBookings for development/testing
+            console.warn('Admin bookings endpoint failed, falling back:', error);
+            const data = await bookingApi.getUserBookings();
+            return Array.isArray(data) ? data : [];
+          }
+        } catch (error) {
+          console.error('Error fetching all bookings:', error);
+          return []; // Return empty array instead of throwing to prevent dashboard from breaking
+        }
+      },
+      ...options
+    });
+  };
 
   /**
    * Get a booking by ID
@@ -174,6 +201,7 @@ export const useBookings = () => {
       onSuccess: () => {
         // Invalidate relevant queries
         queryClient.invalidateQueries({ queryKey: ['user-bookings'] });
+        queryClient.invalidateQueries({ queryKey: ['admin-bookings'] });
       },
       onError: (error) => {
         showError(error.message || 'Failed to create booking. Please try again.');
@@ -198,6 +226,7 @@ export const useBookings = () => {
       onSuccess: (_, id) => {
         // Invalidate relevant queries
         queryClient.invalidateQueries({ queryKey: ['user-bookings'] });
+        queryClient.invalidateQueries({ queryKey: ['admin-bookings'] });
         queryClient.invalidateQueries({ queryKey: ['booking', id] });
       },
       onError: (error) => {
@@ -207,15 +236,52 @@ export const useBookings = () => {
     });
   };
 
+  /**
+   * Get booking statistics by status
+   */
+  const useGetBookingStats = (options = {}) => {
+    return useQuery({
+      queryKey: ['booking-stats'],
+      queryFn: async () => {
+        try {
+          // Try to get the stats from the API first
+          try {
+            const data = await bookingApi.getBookingStats();
+            return data;
+          } catch (error) {
+            // If API fails, calculate from all bookings
+            console.warn('Booking stats endpoint failed, calculating manually:', error);
+            
+            const bookings = await bookingApi.getAllBookings();
+            
+            if (!Array.isArray(bookings)) return { completed: 0, pending: 0, cancelled: 0 };
+            
+            const completed = bookings.filter(b => b.paymentStatus === 'COMPLETED').length;
+            const pending = bookings.filter(b => b.paymentStatus === 'PENDING').length;
+            const cancelled = bookings.filter(b => b.paymentStatus === 'CANCELLED').length;
+            
+            return { completed, pending, cancelled };
+          }
+        } catch (error) {
+          console.error('Error getting booking stats:', error);
+          return { completed: 0, pending: 0, cancelled: 0 };
+        }
+      },
+      ...options
+    });
+  };
+
   // Return all hooks
   return {
     useGetUserBookings,
+    useGetAllBookings,
     useGetBooking,
     useGetBookedSeats,
     useGetSeatingLayout,
     useCalculatePrice,
     useCreateBooking,
-    useCancelBooking
+    useCancelBooking,
+    useGetBookingStats
   };
 };
 

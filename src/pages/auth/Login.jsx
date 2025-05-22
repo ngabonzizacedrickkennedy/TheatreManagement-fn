@@ -1,3 +1,4 @@
+// src/pages/auth/Login.jsx - Updated with 2FA support
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -10,7 +11,7 @@ import { AtSymbolIcon, LockClosedIcon } from '@heroicons/react/24/outline';
 const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, isAuthenticated, loading } = useAuth();
+  const { initiateLogin, isAuthenticated, loading, requiresTwoFactor } = useAuth();
   const { showSuccess, showError } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -27,22 +28,30 @@ const LoginPage = () => {
       const from = location.state?.from || '/';
       navigate(from, { replace: true });
     }
-  }, [isAuthenticated, loading, navigate, location]);
+    
+    // If 2FA is required, redirect to the 2FA page
+    if (requiresTwoFactor && !loading) {
+      navigate('/two-factor-auth', { 
+        state: { from: location.state?.from || '/' } 
+      });
+    }
+  }, [isAuthenticated, loading, requiresTwoFactor, navigate, location]);
   
   // Handle form submission
   const onSubmit = async (data) => {
     setIsSubmitting(true);
     
     try {
-      const success = await login(data.username, data.password);
+      const result = await initiateLogin(data.username, data.password);
       
-      if (success) {
-        // Login successful
-        showSuccess('Login successful!');
-        
-        // Redirect to the page they were trying to access or home
-        const from = location.state?.from || '/';
-        navigate(from, { replace: true });
+      if (result.success) {
+        if (result.requires2FA) {
+          // Redirect to 2FA page will happen in the useEffect hook above
+          showSuccess('Please enter the verification code sent to your email.');
+        } else {
+          // Already logged in, redirect will happen in the useEffect hook above
+          showSuccess('Login successful!');
+        }
       } else {
         // Login failed
         showError('Invalid username or password.');
@@ -54,8 +63,8 @@ const LoginPage = () => {
     }
   };
   
-  // If already authenticated and not loading, don't render the form
-  if (isAuthenticated && !loading) {
+  // If already authenticated or requires 2FA and not loading, don't render the form
+  if ((isAuthenticated || requiresTwoFactor) && !loading) {
     return null;
   }
   
@@ -121,9 +130,9 @@ const LoginPage = () => {
             </div>
             
             <div className="text-sm">
-              <a href="#" className="font-medium text-primary-600 hover:text-primary-500">
+              <Link to="/forgot-password" className="font-medium text-primary-600 hover:text-primary-500">
                 Forgot your password?
-              </a>
+              </Link>
             </div>
           </div>
           

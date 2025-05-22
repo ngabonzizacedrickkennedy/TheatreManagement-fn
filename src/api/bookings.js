@@ -1,4 +1,4 @@
-// src/api/bookings.js - Improved version with better error handling
+// src/api/bookings.js
 import apiClient from './client';
 
 /**
@@ -23,6 +23,32 @@ const bookingApi = {
       return Array.isArray(bookingsData) ? bookingsData : [];
     } catch (error) {
       console.error('Error fetching user bookings:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get all bookings (Admin only)
+   * @returns {Promise<Array>} List of all bookings
+   */
+  getAllBookings: async () => {
+    try {
+      // Try admin endpoint first
+      try {
+        const response = await apiClient.get('/admin/bookings');
+        const responseData = response.data || {};
+        const bookingsData = responseData.data || responseData;
+        return Array.isArray(bookingsData) ? bookingsData : [];
+      } catch (primaryError) {
+        // Try alternative endpoint
+        console.warn('Primary admin endpoint failed, trying alternative:', primaryError);
+        const response = await apiClient.get('/bookings/admin/all');
+        const responseData = response.data || {};
+        const bookingsData = responseData.data || responseData;
+        return Array.isArray(bookingsData) ? bookingsData : [];
+      }
+    } catch (error) {
+      console.error('Error fetching all bookings:', error);
       throw error;
     }
   },
@@ -311,6 +337,47 @@ const bookingApi = {
       return responseData.data || responseData;
     } catch (error) {
       console.error(`Error cancelling booking ${id}:`, error);
+      throw error;
+    }
+  },
+  
+  /**
+   * Get booking statistics by status
+   * @returns {Promise<Object>} Booking statistics
+   */
+  getBookingStats: async () => {
+    try {
+      // Try admin dashboard endpoint first
+      try {
+        const response = await apiClient.get('/admin/dashboard');
+        const dashboardData = response.data?.data || response.data || {};
+        
+        // Try to extract booking stats from dashboard data
+        if (dashboardData.bookingStats) {
+          return dashboardData.bookingStats;
+        }
+        
+        // If dashboard data exists but no booking stats, try to calculate from recent bookings
+        if (dashboardData.recentBookings && Array.isArray(dashboardData.recentBookings)) {
+          const bookings = dashboardData.recentBookings;
+          
+          const completed = bookings.filter(b => b.paymentStatus === 'COMPLETED').length;
+          const pending = bookings.filter(b => b.paymentStatus === 'PENDING').length;
+          const cancelled = bookings.filter(b => b.paymentStatus === 'CANCELLED').length;
+          
+          return { completed, pending, cancelled };
+        }
+        
+        throw new Error('No booking stats found in dashboard data');
+      } catch (primaryError) {
+        // Try alternative endpoint
+        console.warn('Dashboard endpoint failed, trying alternative:', primaryError);
+        
+        const response = await apiClient.get('/admin/bookings/stats');
+        return response.data?.data || response.data;
+      }
+    } catch (error) {
+      console.error('Error fetching booking stats:', error);
       throw error;
     }
   }

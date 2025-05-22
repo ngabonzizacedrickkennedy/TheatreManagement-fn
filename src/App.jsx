@@ -1,3 +1,4 @@
+// src/App.jsx - Updated routes
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
@@ -15,6 +16,9 @@ import MoviesPage from '@pages/public/Movies';
 import MovieDetailsPage from '@pages/public/MovieDetails';
 import LoginPage from '@pages/auth/Login';
 import RegisterPage from '@pages/auth/Register';
+import TwoFactorAuthPage from '@pages/auth/TwoFactorAuth'; // New 2FA page
+import ForgotPasswordPage from '@pages/auth/ForgotPassword'; // New forgot password page
+import ResetPasswordPage from '@pages/auth/ResetPassword'; // New reset password page
 import NotFoundPage from '@pages/public/NotFound';
 
 // User Pages
@@ -86,6 +90,9 @@ const router = createBrowserRouter([
       { path: 'movies/:id', element: <MovieDetailsPage /> },
       { path: 'login', element: <LoginPage /> },
       { path: 'register', element: <RegisterPage /> },
+      { path: 'two-factor-auth', element: <TwoFactorAuthPage /> }, // New 2FA route
+      { path: 'forgot-password', element: <ForgotPasswordPage /> }, // New forgot password route
+      { path: 'reset-password', element: <ResetPasswordPage /> }, // New reset password route
       
       // Protected user routes
       { 

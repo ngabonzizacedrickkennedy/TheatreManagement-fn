@@ -1,3 +1,4 @@
+// src/api/auth.js - Debug version with better error handling
 import apiClient from './client';
 
 /**
@@ -6,15 +7,58 @@ import apiClient from './client';
  */
 const authApi = {
   /**
-   * Login a user with username and password
+   * Initiate login with 2FA
+   * @param {Object} credentials - User credentials
+   * @param {string} credentials.username - Username
+   * @param {string} credentials.password - Password
+   * @returns {Promise<Object>} Login response with 2FA status
+   */
+  initiateLogin: async (credentials) => {
+    try {
+      const response = await apiClient.post('/auth/2fa/initiate', credentials);
+      console.log('API initiate login response:', response); // Debug log
+      return response.data;
+    } catch (error) {
+      console.error('API initiate login error:', error); // Debug log
+      throw error;
+    }
+  },
+
+  /**
+   * Verify OTP for 2FA login
+   * @param {Object} data - Verification data
+   * @param {string} data.username - Username
+   * @param {string} data.password - Password
+   * @param {string} data.otp - OTP code
+   * @returns {Promise<Object>} Login response with token and user info
+   */
+  verifyOtp: async (data) => {
+    try {
+      const response = await apiClient.post('/auth/2fa/verify', data);
+      console.log('API verify OTP response:', response); // Debug log
+      return response.data;
+    } catch (error) {
+      console.error('API verify OTP error:', error); // Debug log
+      throw error;
+    }
+  },
+
+  /**
+   * Login a user with username and password (legacy method without 2FA)
    * @param {Object} credentials - User credentials
    * @param {string} credentials.username - Username
    * @param {string} credentials.password - Password
    * @returns {Promise<Object>} Login response with token and user info
    */
   login: async (credentials) => {
-    const response = await apiClient.post('/auth/login', credentials);
-    return response.data;
+    try {
+      const response = await apiClient.post('/auth/login', credentials);
+      console.log('API login response:', response); // Debug log
+      return response.data;
+    } catch (error) {
+      console.error('API login error:', error); // Debug log
+      throw error;
+    }
   },
 
   /**
@@ -29,39 +73,14 @@ const authApi = {
    * @returns {Promise<Object>} Registration response
    */
   register: async (userData) => {
-    const response = await apiClient.post('/auth/signup', userData);
-    return response.data;
-  },
-
-  /**
-   * Get the current user's profile
-   * @returns {Promise<Object>} User profile data
-   */
-  getCurrentUser: async () => {
-    const response = await apiClient.get('/user/profile');
-    return response.data;
-  },
-
-  /**
-   * Update the user's profile
-   * @param {Object} userData - Updated user data
-   * @returns {Promise<Object>} Updated user profile
-   */
-  updateProfile: async (userData) => {
-    const response = await apiClient.put('/user/profile', userData);
-    return response.data;
-  },
-
-  /**
-   * Change the user's password
-   * @param {Object} passwordData - Password change data
-   * @param {string} passwordData.currentPassword - Current password
-   * @param {string} passwordData.newPassword - New password
-   * @returns {Promise<Object>} Response
-   */
-  changePassword: async (passwordData) => {
-    const response = await apiClient.post('/user/change-password', passwordData);
-    return response.data;
+    try {
+      const response = await apiClient.post('/auth/signup', userData);
+      console.log('API register response:', response); // Debug log
+      return response.data;
+    } catch (error) {
+      console.error('API register error:', error); // Debug log
+      throw error;
+    }
   },
 
   /**
@@ -71,8 +90,48 @@ const authApi = {
    * @returns {Promise<Object>} Response
    */
   requestPasswordReset: async (data) => {
-    const response = await apiClient.post('/auth/forgot-password', data);
-    return response.data;
+    try {
+      console.log('API requesting password reset for:', data.email); // Debug log
+      const response = await apiClient.post('/auth/password/forgot', data);
+      console.log('API password reset request response:', response); // Debug log
+      return response.data;
+    } catch (error) {
+      console.error('API password reset request error:', error); // Debug log
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      throw error;
+    }
+  },
+
+  /**
+   * Validate password reset token
+   * @param {Object} data - Token validation data
+   * @param {string} data.token - Reset token
+   * @returns {Promise<Object>} Response with validation status
+   */
+  validateResetToken: async (data) => {
+    try {
+      console.log('API validating reset token:', data.token); // Debug log
+      const response = await apiClient.post('/auth/password/validate-token', data);
+      console.log('API token validation response:', response); // Debug log
+      return response.data;
+    } catch (error) {
+      console.error('API token validation error:', error); // Debug log
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      
+      // Return a more detailed error response
+      if (error.response?.data) {
+        throw new Error(error.response.data.message || 'Token validation failed');
+      }
+      throw error;
+    }
   },
 
   /**
@@ -83,8 +142,25 @@ const authApi = {
    * @returns {Promise<Object>} Response
    */
   resetPassword: async (data) => {
-    const response = await apiClient.post('/auth/reset-password', data);
-    return response.data;
+    try {
+      console.log('API resetting password with token:', data.token); // Debug log
+      const response = await apiClient.post('/auth/password/reset', data);
+      console.log('API password reset response:', response); // Debug log
+      return response.data;
+    } catch (error) {
+      console.error('API password reset error:', error); // Debug log
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      
+      // Return a more detailed error response
+      if (error.response?.data) {
+        throw new Error(error.response.data.message || 'Password reset failed');
+      }
+      throw error;
+    }
   }
 };
 
