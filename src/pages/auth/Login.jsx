@@ -1,4 +1,4 @@
-// src/pages/auth/Login.jsx - Updated with 2FA support
+// src/pages/auth/Login.jsx - Fixed version
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -11,7 +11,7 @@ import { AtSymbolIcon, LockClosedIcon } from '@heroicons/react/24/outline';
 const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { initiateLogin, isAuthenticated, loading, requiresTwoFactor } = useAuth();
+  const { initiateLogin, isAuthenticated, loading, requiresTwoFactor, isAdmin, isManager } = useAuth();
   const { showSuccess, showError } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -22,20 +22,35 @@ const LoginPage = () => {
     formState: { errors }
   } = useForm();
   
-  // If already authenticated, redirect to home or the page they were trying to access
+  // If already authenticated, redirect based on role - but NOT if 2FA is required
   useEffect(() => {
-    if (isAuthenticated && !loading) {
-      const from = location.state?.from || '/';
-      navigate(from, { replace: true });
+    if (isAuthenticated && !loading && !requiresTwoFactor) {
+      console.log('User authenticated in Login.jsx, checking roles...');
+      
+      // Determine redirect path based on role
+      let redirectPath = '/';
+      
+      if (isAdmin || isManager) {
+        redirectPath = '/admin';
+        console.log('Admin/Manager user, redirecting to:', redirectPath);
+      } else {
+        redirectPath = location.state?.from || '/';
+        console.log('Regular user, redirecting to:', redirectPath);
+      }
+      
+      navigate(redirectPath, { replace: true });
     }
     
     // If 2FA is required, redirect to the 2FA page
     if (requiresTwoFactor && !loading) {
+      console.log('2FA required, redirecting to 2FA page');
       navigate('/two-factor-auth', { 
-        state: { from: location.state?.from || '/' } 
+        state: { 
+          from: location.state?.from || (isAdmin || isManager ? '/admin' : '/') 
+        } 
       });
     }
-  }, [isAuthenticated, loading, requiresTwoFactor, navigate, location]);
+  }, [isAuthenticated, loading, requiresTwoFactor, navigate, location, isAdmin, isManager]);
   
   // Handle form submission
   const onSubmit = async (data) => {
@@ -46,10 +61,10 @@ const LoginPage = () => {
       
       if (result.success) {
         if (result.requires2FA) {
-          // Redirect to 2FA page will happen in the useEffect hook above
+          // Don't redirect here - let the useEffect handle it
           showSuccess('Please enter the verification code sent to your email.');
         } else {
-          // Already logged in, redirect will happen in the useEffect hook above
+          // Direct login successful - let useEffect handle redirect
           showSuccess('Login successful!');
         }
       } else {
@@ -65,7 +80,11 @@ const LoginPage = () => {
   
   // If already authenticated or requires 2FA and not loading, don't render the form
   if ((isAuthenticated || requiresTwoFactor) && !loading) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+      </div>
+    );
   }
   
   return (
@@ -161,7 +180,7 @@ const LoginPage = () => {
           </div>
           <div className="mt-6">
             <p className="text-center text-sm text-gray-500">
-              Username: <span className="font-medium">demo</span> | Password: <span className="font-medium">password123</span>
+              Admin: <span className="font-medium">admin</span> | Password: <span className="font-medium">admin123</span>
             </p>
           </div>
         </div>

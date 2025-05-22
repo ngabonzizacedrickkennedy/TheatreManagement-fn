@@ -1,4 +1,4 @@
-// src/pages/auth/TwoFactorAuth.jsx
+// src/pages/auth/TwoFactorAuth.jsx - Fixed version
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@contexts/AuthContext';
@@ -10,18 +10,38 @@ import { LockClosedIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 const TwoFactorAuthPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { verifyOtp, twoFactorData, requiresTwoFactor, loading } = useAuth();
+  const { verifyOtp, twoFactorData, requiresTwoFactor, loading, isAuthenticated, isAdmin, isManager } = useAuth();
   const { showSuccess, showError } = useToast();
   
   const [otp, setOtp] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // If not in 2FA state, redirect to login
+  // If not in 2FA state and not loading, redirect to login
   useEffect(() => {
-    if (!requiresTwoFactor && !loading) {
+    if (!requiresTwoFactor && !loading && !isAuthenticated) {
+      console.log('No 2FA required and not authenticated, redirecting to login');
       navigate('/login');
+      return;
     }
-  }, [requiresTwoFactor, loading, navigate]);
+    
+    // If already authenticated (2FA completed), redirect based on role
+    if (isAuthenticated && !loading) {
+      console.log('2FA completed, user authenticated, determining redirect...');
+      
+      // Determine redirect path based on role and location state
+      let redirectPath = '/';
+      
+      if (isAdmin || isManager) {
+        redirectPath = '/admin';
+        console.log('Admin/Manager user after 2FA, redirecting to:', redirectPath);
+      } else {
+        redirectPath = location.state?.from || '/';
+        console.log('Regular user after 2FA, redirecting to:', redirectPath);
+      }
+      
+      navigate(redirectPath, { replace: true });
+    }
+  }, [requiresTwoFactor, loading, isAuthenticated, navigate, location, isAdmin, isManager]);
   
   // Handle OTP verification
   const handleVerify = async (e) => {
@@ -38,11 +58,8 @@ const TwoFactorAuthPage = () => {
       const success = await verifyOtp(otp);
       
       if (success) {
-        showSuccess('Login successful!');
-        
-        // Redirect to the page they were trying to access or home
-        const from = location.state?.from || '/';
-        navigate(from, { replace: true });
+        showSuccess('2FA verification successful!');
+        // Don't redirect here - let useEffect handle it after auth state updates
       } else {
         showError('Invalid verification code. Please try again.');
       }
@@ -53,9 +70,22 @@ const TwoFactorAuthPage = () => {
     }
   };
   
-  // If not in 2FA state or loading, don't render
+  // If not in 2FA state or loading, show loading or nothing
   if (!requiresTwoFactor || loading) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+  
+  // If already authenticated (shouldn't happen due to useEffect, but safety check)
+  if (isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+      </div>
+    );
   }
   
   return (

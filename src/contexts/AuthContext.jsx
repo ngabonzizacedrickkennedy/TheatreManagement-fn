@@ -1,4 +1,4 @@
-// src/contexts/AuthContext.jsx - Fixed version with better error handling
+// src/contexts/AuthContext.jsx - Fixed version with better state management
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import authApi from '@api/auth';
 
@@ -36,9 +36,12 @@ export const AuthProvider = ({ children }) => {
       if (storedToken && storedUser) {
         try {
           setToken(storedToken);
-          setUser(JSON.parse(storedUser));
+          const userData = JSON.parse(storedUser);
+          setUser(userData);
+          console.log('Auth initialized from storage:', userData);
         } catch (err) {
           // Invalid stored user data
+          console.error('Invalid stored user data:', err);
           localStorage.removeItem('auth_token');
           localStorage.removeItem('user');
         }
@@ -51,21 +54,35 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   /**
+   * Debug log for auth state changes
+   */
+  useEffect(() => {
+    console.log('Auth state changed:', { 
+      isAuthenticated: !!user, 
+      user, 
+      requiresTwoFactor: !!twoFactorData,
+      loading 
+    });
+  }, [user, twoFactorData, loading]);
+
+  /**
    * Initiate login with 2FA
    * @param {string} username - Username
    * @param {string} password - Password
    * @returns {Promise<Object>} Login response
    */
   const initiateLogin = useCallback(async (username, password) => {
+    console.log('Initiating login for:', username);
     setLoading(true);
     setError(null);
     
     try {
       const response = await authApi.initiateLogin({ username, password });
-      console.log('Initiate login response:', response); // Debug log
+      console.log('Initiate login response:', response);
       
       // Check if 2FA is required
       if (response.requires2FA) {
+        console.log('2FA required for user:', username);
         setTwoFactorData({
           username,
           password,
@@ -76,7 +93,7 @@ export const AuthProvider = ({ children }) => {
       
       // If 2FA is not required, check if we have token data directly in response
       if (response.token && response.username) {
-        // Direct login without 2FA
+        console.log('Direct login without 2FA');
         const { token, username: user, roles } = response;
         
         // Store auth data
@@ -97,7 +114,7 @@ export const AuthProvider = ({ children }) => {
       return { success: false, error: 'Unexpected response from server' };
       
     } catch (err) {
-      console.error('Initiate login error:', err); // Debug log
+      console.error('Initiate login error:', err);
       setError(err.message || 'Login failed');
       return { success: false, error: err.message || 'Login failed' };
     } finally {
@@ -116,13 +133,14 @@ export const AuthProvider = ({ children }) => {
       return false;
     }
     
+    console.log('Verifying OTP for user:', twoFactorData.username);
     setLoading(true);
     setError(null);
     
     try {
       const { username, password } = twoFactorData;
       const response = await authApi.verifyOtp({ username, password, otp });
-      console.log('Verify OTP response:', response); // Debug log
+      console.log('Verify OTP response:', response);
       
       // Handle both possible response structures
       let tokenData;
@@ -142,6 +160,8 @@ export const AuthProvider = ({ children }) => {
         return false;
       }
       
+      console.log('OTP verification successful for user:', user, 'with roles:', roles);
+      
       // Store auth data
       localStorage.setItem('auth_token', token);
       
@@ -154,7 +174,7 @@ export const AuthProvider = ({ children }) => {
       
       return true;
     } catch (err) {
-      console.error('Verify OTP error:', err); // Debug log
+      console.error('Verify OTP error:', err);
       setError(err.message || 'OTP verification failed');
       return false;
     } finally {
@@ -187,7 +207,7 @@ export const AuthProvider = ({ children }) => {
       await authApi.register(userData);
       return true;
     } catch (err) {
-      console.error('Registration error:', err); // Debug log
+      console.error('Registration error:', err);
       setError(err.message || 'Registration failed');
       return false;
     } finally {
@@ -206,10 +226,10 @@ export const AuthProvider = ({ children }) => {
     
     try {
       const response = await authApi.requestPasswordReset({ email });
-      console.log('Password reset request response:', response); // Debug log
+      console.log('Password reset request response:', response);
       return true;
     } catch (err) {
-      console.error('Password reset request error:', err); // Debug log
+      console.error('Password reset request error:', err);
       setError(err.message || 'Password reset request failed');
       return false;
     } finally {
@@ -226,27 +246,24 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     setError(null);
     
-    console.log('Validating reset token:', token); // Debug log
+    console.log('Validating reset token:', token);
     
     try {
       const response = await authApi.validateResetToken({ token });
-      console.log('Token validation response:', response); // Debug log
+      console.log('Token validation response:', response);
       
-      // The response is already the extracted data from API client
-      // Check if the response has valid: true directly
       if (response && response.valid === true) {
-        console.log('Token validation successful, data:', response); // Debug log
+        console.log('Token validation successful, data:', response);
         return { valid: true, data: response };
       } else {
-        console.log('Token validation failed, response:', response); // Debug log
+        console.log('Token validation failed, response:', response);
         const errorMsg = response?.message || 'Invalid token';
         setError(errorMsg);
         return { valid: false, error: errorMsg };
       }
     } catch (err) {
-      console.error('Token validation error:', err); // Debug log
+      console.error('Token validation error:', err);
       
-      // Handle different error response formats
       let errorMessage = 'Invalid or expired token';
       
       if (err.response?.data?.message) {
@@ -272,14 +289,14 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     setError(null);
     
-    console.log('Resetting password with token:', token); // Debug log
+    console.log('Resetting password with token:', token);
     
     try {
       const response = await authApi.resetPassword({ token, newPassword });
-      console.log('Password reset response:', response); // Debug log
+      console.log('Password reset response:', response);
       return true;
     } catch (err) {
-      console.error('Password reset error:', err); // Debug log
+      console.error('Password reset error:', err);
       setError(err.message || 'Password reset failed');
       return false;
     } finally {
@@ -296,6 +313,7 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     setToken(null);
     setTwoFactorData(null);
+    console.log('User logged out');
   }, []);
 
   /**
@@ -304,17 +322,25 @@ export const AuthProvider = ({ children }) => {
    * @returns {boolean} Whether user has any of the specified roles
    */
   const hasRole = useCallback((roles) => {
-    if (!user) return false;
+    if (!user || !user.roles) {
+      console.log('No user or roles available for role check');
+      return false;
+    }
     
     const userRoles = user.roles || '';
+    console.log('Checking roles:', roles, 'against user roles:', userRoles);
     
     // Check for multiple roles
     if (Array.isArray(roles)) {
-      return roles.some(role => userRoles.includes(role));
+      const hasAnyRole = roles.some(role => userRoles.includes(role));
+      console.log('Has any role result:', hasAnyRole);
+      return hasAnyRole;
     }
     
     // Check for a single role
-    return userRoles.includes(roles);
+    const hasRoleResult = userRoles.includes(roles);
+    console.log('Has role result:', hasRoleResult);
+    return hasRoleResult;
   }, [user]);
 
   // Check if user is authenticated
